@@ -60,7 +60,7 @@ class Controller(BoxLayout):
             self, searchables=[('upnp:rootdevice', self.on_device),
                                ('schemas-upnp-org:device:', self.on_device)],
             network='cloud',
-            cloud_user=('test@xmpp.bertrandverdu.me', 'test'))
+            cloud_user=('test@xmpp.example.com', 'test'))
         self.controller.startService()
         for room, value in self.app.rooms.items():
             if room != 'New':
@@ -457,7 +457,6 @@ class KontrollerApp(App):
 #              self.update_conf(section, option, config.get(section, option))
         self.icon = 'data/icons/logo3.png'
         self.title = 'onDemand Controller'
-#         Window.bind(on_request_close=self.clean_state)
         Window.bind(on_close=self.clean_state)
         self.root = Controller(self)
         return self.root
