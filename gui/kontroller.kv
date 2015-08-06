@@ -1,0 +1,945 @@
+#:kivy 1.8.0
+#:import Factory kivy.factory.Factory
+#:import ListItemButton kivy.uix.listview.ListItemButton
+#:import StackLayout kivy.uix.stacklayout.StackLayout
+#:import Window kivy.core.window.Window
+
+
+### Main Widget ###
+
+<Controller>:
+    icon: 'data/icons/logo3.png'
+    orientation: 'vertical'
+    rooms: self.rooms
+    active_room: self.active_room
+    canvas.before:
+        Color:
+            rgb: .6, .6, .6
+        Rectangle:
+            size: self.size
+            source: 'data/background.png'
+    ActionBar:
+        ActionView:
+            id: av
+            ActionPrevious:
+                with_previous: (False if root.sm.current_screen.name == 'StartScreen' else True) if root.sm.current_screen else False
+                id: prev
+                title: (root.sm.current_screen.name if (root.sm.current_screen and  root.sm.current_screen.name != 'Home') else root.active_room)
+                app_icon: 'data/icons/logo3.png'
+                on_release: 
+                    #if root.sm.current_screen and root.sm.current_screen.name == 'Home': root.set_room('Home')
+                    room = ('Home' if root.sm.current_screen and root.sm.current_screen.name == 'Home' else root.active_room)
+                    root.set_room(room)
+                    root.sm.current = 'Home'
+            ActionSpinner:
+                id: active_room
+                text: root.active_room
+                values: root.rooms.keys()
+                on_text:
+                    if root.active_room != args[1]:\
+                    root.set_room(args[1])
+            ActionButton:
+                icon: 'atlas://data/images/defaulttheme/overflow'
+                on_press:
+                    app.open_settings()
+                    
+ ###########################################################################
+ ############################ Screens #########################################
+ ###########################################################################
+ 
+################### Home screen ##################### 
+
+<Home>:
+    status: self.status
+    background: self.background
+    canvas.before:
+        Color:
+            rgb: 1, 1, 1, 1
+        Rectangle:
+            size: self.size
+            source: root.background
+    #on_touch_down:
+        #print(self.size)
+    #FloatLayout:
+        #id: icons
+
+################### Media Player  #####################
+
+<MediaPlayer>:
+    bgimg:  self.bgimg
+    playing: self.playing
+    volume: self.volume
+    volume_steps: self.volume_steps
+    time_: self.time_
+    timer: self.timer
+    repeat: self.repeat
+    shuffle: self.shuffle
+    duration: self.duration
+    info: self.info
+    AnchorLayout:
+        BgImage:
+            size_hint: 0, 0
+            source: root.bgimg
+    BoxLayout:
+        orientation: 'vertical'
+        Carousel:
+            index: 1
+            id: mpcarousel
+            direction: 'right'
+            TabbedPanel:
+                id: library
+                do_default_tab: False
+                on_current_tab:
+                    print('oh')
+                    root.register_server(args[1].id)
+                TabbedPanelItem:
+                    text: 'Local'
+                    id: localserver
+                    BoxLayout:
+                        pos: root.pos
+                        size: root.size
+                        size_hint: None, None
+                        orientation: 'vertical'
+                        BoxLayout:
+                            orientation: 'horizontal'
+                            size_hint: (1, 0.05)
+                            TextInput:
+                                multiline: False
+                                size_hint_x: 0.4
+                                text: 'Search'
+                            Button:
+                                size_hint_x: 0.1
+                                Image:
+                                    y: self.parent.y
+                                    x: self.parent.x
+                                    allow_stretch: True
+                                    size: self.parent.size
+                                    source: 'data/icons/search.png'
+                            Spinner:
+                                size_hint_x: 0.5
+                                text: 'All'
+                                values: ['All', 'Video', 'Music', 'Pictures']
+                        ScrollView:
+                            id: scrollview
+                            do_scroll_x: False
+                            Scatter:
+                                do_rotation: False
+                                do_scale: False
+                                do_translation: False
+                                size: treeLocal.size
+                                size_hint_y: None
+                                TreeView:
+                                    root_options:
+                                        {'text': 'Local', 'is_open': False}
+                                    id: treeLocal
+                                    width: scrollview.width
+                                    height: self.minimum_height
+                                    size_hint_y: None
+            BoxLayout:
+                orientation: 'vertical'
+                ListView:
+                    id: trackslist
+            BoxLayout:
+                orientation: 'vertical'
+                Button:
+                    size_hint: (1, 0.1)
+                    text: playerstatus.text
+                    background_color: (.5,.5,.5,.5)
+                    on_press:
+                        mpcarousel.index = 1
+                Label:
+                    text: ''
+                BoxLayout:
+                    size_hint: (1, 0.3)
+                    orientation: 'vertical'
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        Label:
+                            size_hint: (.1, 1)
+                            text: ''
+                        ButtonVolume:
+                            source: self.source
+                            size_hint: (0.3, 1)
+                            id: volvalue
+                            allow_stretch: True
+                            volume: root.volume
+                            max_vol: root.volume_steps
+                            popup: root.volpopup
+                        ButtonPrev:
+                            #allow_stretch: True
+                            source: 'data/icons/prev2.png'
+                            previous: root.previous
+                        ButtonPlayPause:
+                            allow_stretch: True
+                            state: root.playing
+                            play: root.playpause
+                        ButtonNext:
+                            #allow_stretch: True
+                            source: 'data/icons/next2.png'
+                            next: root.next
+                        BoxLayout:
+                            size_hint: (.3, 1)
+                            orientation: 'vertical'
+                            ButtonRepeat:
+                                allow_stretch: True
+                                media: root
+                                state: root.repeat
+                            ButtonShuffle:
+                                allow_stretch: True
+                                media: root
+                                state: root.shuffle
+                        Label:
+                            size_hint: (.1, 1)
+                            text: ''
+                FloatLayout:
+                    size_hint: (1, .2)
+                    ProgressBar:
+                        pos_hint: {'x': 0}
+                        orientation: 'horizontal'
+                        max: root.duration
+                        value: root.timer
+                    Slider:
+                        pos_hint: {'x': 0}
+                        orientation: 'horizontal'
+                        max: root.duration
+                        value: 0
+                        opacity: 0.0
+                        on_value:
+                            root.seek(args[1])
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint: (1, 0.1)
+            Button:
+                size_hint: (0.3, 1)
+                text: 'Library'
+                background_color: (.5,.5,.5,.5)
+                on_press:
+                    mpcarousel.index = 0
+            Button:
+                id: playerstatus
+                #_label: playerinfo
+                text: root.info + '  ' + root.time_
+                background_color: (.5,.5,.5,.5)
+                on_press:
+                    mpcarousel.index = (1 if mpcarousel.index == 2 else 2)
+                    
+################# Start Layout #################
+<StartPage>:
+    format: self.format
+    cols: 1
+    canvas:
+        Color:
+            rgba: 0, 0, 0, 0
+        Rectangle:
+            pos: self.parent.pos if self.parent else self.pos
+            size: self.size
+    size_hint: (1, 1)
+    LabelCategory:
+        text: 'Quick Actions / Scenarios'
+    ScrollView:
+        do_scroll_y: False
+        width: Window.size[0]
+        size_hint: None, 1
+        DeviceLayout:
+            id: bookmarks
+            typ: 'bookmarks'
+            Button:
+                #height: root.format[1]
+                width: root.format[0]
+                size_hint: None, 1
+                background_color: .5, .5, .5, .5
+                border: 0, 0, 0, 0
+                text: ''
+                on_press:
+                    print('rotation: %s -- Size: %s' % (Window.rotation, Window.size))
+                BoxLayout:
+                    orientation: 'vertical'
+                    pos: self.parent.pos
+                    size: self.parent.size
+                    Image:
+                        y: self.parent.y - 20
+                        x: self.parent.x
+                        size_hint: 1, .8
+                        source: 'data/icons/out.png'
+                    Label:
+                        size_hint: 1, .2
+                        text: "We are out"
+            Button:
+                #height: root.format[1]
+                width: root.format[0]
+                size_hint: None, 1
+                background_color: .5, .5, .5, .5
+                border: 0, 0, 0, 0
+                text: ''
+                on_press:
+                    app.root.all_lights_off()
+                BoxLayout:
+                    orientation: 'vertical'
+                    pos: self.parent.pos
+                    size: self.parent.size
+                    Image:
+                        y: self.parent.y - 20
+                        x: self.parent.x
+                        size_hint: 1, .8
+                        source: 'data/icons/all_lights_off.png'
+                    Label:
+                        size_hint: 1, .2
+                        text: "All lights off"
+            Button:
+                #height: root.format[1]
+                width: root.format[0]
+                size_hint: None, 1
+                background_color: .5, .5, .5, .5
+                border: 0, 0, 0, 0
+                text: ''
+                on_press:
+                    app.root.all_lights_off()
+                BoxLayout:
+                    orientation: 'vertical'
+                    pos: self.parent.pos
+                    size: self.parent.size
+                    Image:
+                        y: self.parent.y - 20
+                        x: self.parent.x
+                        size_hint: 1, .8
+                        source: 'data/icons/closed.png'
+                    Label:
+                        size_hint: 1, .2
+                        text: "Close all issues"
+    LabelCategory:
+        text: 'Rooms'
+    ScrollView:
+        do_scroll_y: False
+        width: Window.size[0]
+        size_hint: None, 1
+        DeviceLayout:
+            id: rooms
+            typ: 'rooms'
+    LabelCategory:
+        text: 'Lights'
+    ScrollView:
+        size_hint: None, 1
+        DeviceLayout:
+            id: lights
+            typ: 'lights'
+    LabelCategory:
+        text: 'Media Players'
+    ScrollView:
+        size_hint: None, 1
+        DeviceLayout:
+            id: medias
+            typ: 'medias'
+    LabelCategory:
+        text: 'Shutters'
+    ScrollView:
+        size_hint: None, 1
+        DeviceLayout:
+            id: shutters
+            typ: 'shutters'
+            Button:
+                #height: root.format[1]
+                width: root.format[0]
+                size_hint: None, 1
+                background_color: .5, .5, .5, .5
+                border: 0, 0, 0, 0
+                text: ''
+                on_press:
+                    app.root.all_lights_off()
+                BoxLayout:
+                    orientation: 'vertical'
+                    pos: self.parent.pos
+                    size: self.parent.size
+                    Image:
+                        y: self.parent.y - 20
+                        x: self.parent.x
+                        size_hint: 1, .8
+                        source: 'data/icons/shutter.png'
+                    Label:
+                        size_hint: 1, .2
+                        text: "Salon"
+            Button:
+                #height: root.format[1]
+                width: root.format[0]
+                size_hint: None, 1
+                background_color: .5, .5, .5, .5
+                border: 0, 0, 0, 0
+                text: ''
+                on_press:
+                    app.root.all_lights_off()
+                BoxLayout:
+                    orientation: 'vertical'
+                    pos: self.parent.pos
+                    size: self.parent.size
+                    Image:
+                        y: self.parent.y - 20
+                        x: self.parent.x
+                        size_hint: 1, .8
+                        source: 'data/icons/shutter.png'
+                    Label:
+                        size_hint: 1, .2
+                        text: "Chambre"
+            Button:
+                #height: root.format[1]
+                width: root.format[0]
+                size_hint: None, 1
+                background_color: .5, .5, .5, .5
+                border: 0, 0, 0, 0
+                text: ''
+                on_press:
+                    app.root.all_lights_off()
+                BoxLayout:
+                    orientation: 'vertical'
+                    pos: self.parent.pos
+                    size: self.parent.size
+                    Image:
+                        y: self.parent.y - 20
+                        x: self.parent.x
+                        size_hint: 1, .8
+                        source: 'data/icons/shutter.png'
+                    Label:
+                        size_hint: 1, .2
+                        text: "Chambre Lila"
+
+#################Custom Buttons ###############
+
+<DeviceLayout@GridLayout>:
+    rows: 1
+    size_hint: None, 1
+    #height: Window.size[1]/7
+    padding: '1dp'
+    spacing: '5dp'
+    #size_hint_y: 1
+    #size_hint_x: 1
+    width: self.minimum_width
+    
+<LabelCategory@Label>:
+    canvas:
+        Color:
+            rgba: .5, .5, .5, .7
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    size_hint_y: None
+    #height: '40dp'
+    height: Window.size[1]/21
+    typ: None
+    
+<RoomButton>:
+    pic: self.pic
+    ltext: self.ltext
+    background_color: .5, .5, .5, .5
+    border: 0, 0, 0, 0
+    text: ''
+    on_press:
+        app.root.set_room(root.ltext)
+    BoxLayout:
+        orientation: 'vertical'
+        pos: self.parent.pos
+        size: self.parent.size
+        Image:
+            y: self.parent.y - 20
+            x: self.parent.x
+            size_hint: 1, .8
+            source: root.pic
+        Label:
+            size_hint: 1, .2
+            text: root.ltext
+    
+    
+<ScatterCross>:
+    canvas:
+        Color:
+            rgba: 1, 1, 1, .1
+        Rectangle:
+            size: self.size
+    canvas.after:
+        Color:
+            hsv: 1, 1, 1
+            a: .1
+        Rectangle:
+            pos: self.pos
+            size: self.bbox[1]
+        Color:
+            rgb: 0, 0, 0
+        Line:
+            points: [self.x, self.y, self.right, self.top]
+            width: 2
+        Line:
+            points: [self.x, self.top, self.right, self.y]
+            width: 2
+
+
+<SensorPad>:
+    do_scale: False
+    do_rotation: False
+    #size: '120dp', '40dp'
+    canvas:
+        Color:
+            rgba: .1, .1, .1, .6
+        Rectangle:
+            size: self.size
+    BoxLayout:
+        id: bl
+        orientation: 'vertical'
+        size: self.parent.size
+
+     
+<DeviceButton>:
+    pic_true: 'data/icons/lamp_1.png'
+    pic_false: 'data/icons/lamp_0.png'
+    state: self.state
+    name: self.name
+    #unlocked: self.unlocked
+    #do_collide_after_children: True
+    do_translation_x: False
+    do_translation_y: False
+    do_scale: False
+    do_rotation: False
+    pic: self.pic_true if (self.state is True) else self.pic_false
+    pos: self.pos
+    on_do_translation_x:
+        print(args[1])
+        self.do_translation_x = self.do_translation_y = args[1]
+    size: '50dp', '50dp'
+    #pos_hint: {'x': 0, 'y': 1}
+    #size: root.bbox[1]
+    #size_hint: .1, .1
+    BoxLayout:
+        orientation: 'vertical'
+        size: self.parent.size
+        on_touch_down:
+            root.pushed()
+        #pos: root.pos
+        #size: root.bbox[1]
+        Image:
+            y: self.parent.y - 10
+            x: self.parent.x
+            source: root.pic
+        #Label:
+         #   size_hint: 1, .2
+            # text_size: self.size
+          #  text: root.name
+            
+<LightButtonWithText>:
+    pic: self.pic
+    ltext: self.ltext
+    background_color: .5, .5, .5, .5
+    border: 0, 0, 0, 0
+    text: ''
+    on_press:
+        app.root.set_room(root.ltext)
+    BoxLayout:
+        orientation: 'vertical'
+        pos: self.parent.pos
+        size: self.parent.size
+        Image:
+            y: self.parent.y - 10
+            x: self.parent.x
+            size_hint: 1, .8
+            source: root.pic
+        Label:
+            size_hint: 1, .2
+            text: root.ltext
+            
+<MediaButtonWithText>:
+    pic: self.pic
+    ltext: self.ltext
+    device: self.device
+    background_color: .5, .5, .5, .5
+    border: 0, 0, 0, 0
+    text: ''
+    on_press:
+        app.root.set_device(root.device)
+    BoxLayout:
+        orientation: 'vertical'
+        pos: self.parent.pos
+        size: self.parent.size
+        Image:
+            y: self.parent.y - 10
+            x: self.parent.x
+            size_hint: 1, .8
+            source: root.pic
+        Label:
+            size_hint: 1, .2
+            text: root.ltext
+    
+<PlayerButton>:
+    pic_true: 'data/icons/multimedia_playing.png'
+    pic_false: 'data/icons/multimedia_stopped.png'
+    
+<Player_menu>:
+    orientation: 'vertical'
+    pop: self.pop
+    on_size:
+        root.pop.define_size(self.size)
+    Button:
+        text: 'Unlock'
+        on_press:
+            root.pop.parent.unlock()
+            root.pop.dismiss()
+    Button:
+        text: 'Open'
+        on_press:
+            root.pop.dismiss()
+            root.pop.parent.open()
+    Button:
+        text: 'Cancel'
+        on_press:
+            root.pop.dismiss()
+
+<Light_menu>:
+    orientation: 'vertical'
+    pop: self.pop
+    on_size:
+        root.pop.define_size(self.size)
+    Button:
+        text: 'Unlock'
+        on_press:
+            root.pop.parent.unlock()
+            root.pop.dismiss()
+    Button:
+        text: 'Cancel'
+        on_press:
+            root.pop.dismiss()              
+    
+<Bubble_device>:
+    orientation: 'vertical'
+    arrow_pos: 'left_mid'
+    #size_hint: (None, None)
+    #size: (160, 120)
+    pos_hint: {'left_x': 3, 'y': 0}
+    BubbleButton:
+        text: 'Unlock'
+        on_release:
+            root.parent.unlock()
+    BubbleButton:
+        text: 'Cancel'
+        on_release:
+            root.parent.remove_widget(root)
+            
+<Bubble_player>:
+    orientation: 'vertical'
+    arrow_pos: 'left_mid'
+    #size_hint: (None, None)
+    #size: (160, 120)
+    pos_hint: {'left_x': 0.9, 'y': 0}
+    BubbleButton:
+        text: 'Open'
+        on_release:
+            root.parent.open()
+            root.parent.remove_widget(root)
+    BubbleButton:
+        text: 'Unlock'
+        on_release:
+            root.parent.unlock()
+    BubbleButton:
+        text: 'Cancel'
+        on_release:
+            root.parent.remove_widget(root)
+    
+<LightButton>:
+    background_normal: 'data/icons/lamp_0.png'
+    background_down: 'data/icons/lamp_1.png'
+    border: 0, 0, 0, 0
+    name: self.name
+    #BoxLayout:
+       # pos: self.parent.pos
+        #size: self.parent.size
+        #orientation: 'vertical'
+        #Label:
+           # id: light_name
+            #text_size: self.size
+            #text: root.name
+            #size_hint_y: 0.1
+            #halign: 'center'
+
+<TrackListPopUp>:
+    orientation: 'vertical'
+    on_size:
+        root.button.define_size(self.size)
+    Button:
+        text: 'Play'
+        size_hint_y: .2
+        #height: 44
+        on_release:
+            app.root.mediaplayer.call('play', root.button.trackid)
+            root.button.close_menu(None)
+    Button:
+        text: 'Remove'
+        size_hint_y: .2
+        #height: 44
+        on_release:
+            app.root.mediaplayer.call('remove', root.button.trackid)
+            root.button.close_menu(None)
+    Button:
+        text: 'Move'
+        size_hint_y: .2
+        #height: 44
+        on_release:
+            print('move')
+            root.button.close_menu(None)
+
+<TrackListDropDown>:
+    auto_width: False
+    size_hint_x: 0.5
+    pos_hint: {'x': 0.5}
+    id: tdd
+    auto_dismiss: False
+    #on_open:
+        #self.attach_to.register_tdd(self)
+    #on_dismiss:
+        #print('closed')
+        #if self.attach_to: self.attach_to.unregister_tdd()
+    on_select:
+        app.root.mediaplayer.call(args[1], self.attach_to.trackid)
+    Button:
+        text: 'Play'
+        size_hint_y: None
+        height: 44
+        on_release:
+            root.select('play')
+    Button:
+        text: 'Remove'
+        size_hint_y: None
+        height: 44
+        on_release:
+            root.select('remove')
+    Button:
+        text: 'Move'
+        size_hint_y: None
+        height: 44
+        on_release:
+            root.select('move')
+
+<MyLib>:
+    deselected_color: [0.5, 0.5, 0.5, 0.4]
+    selected_color: [0, 0, 0, 0.4]
+    #size_hint_y: .15
+    img: self.img
+    title: self.title
+    trackid: self.trackid
+    artist: self.artist
+    BoxLayout:
+        pos: self.parent.pos
+        size: self.parent.size
+        orientation: 'horizontal'
+        ArtistImage:
+            source: root.img
+            size_hint: 0.1, .9
+            #width: 74
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint: 0.9, 1
+            Label:
+                bold: True
+                text: root.title
+                size_hint_y: 0.6
+            Label:
+                halign: 'justify'
+                italic: True
+                text: root.artist
+                size_hint_y: 0.4
+  
+<ListView>:
+    container: container
+    ScrollView:
+        pos: root.pos
+        on_scroll_y: root._scroll(args[1])
+        do_scroll_x: False
+        bar_width: 10
+        scroll_wheel_distance: 120
+        #scroll_timeout: 10
+        #scroll_y: .9
+        GridLayout:
+            cols: 1
+            id: container
+            size_hint_y: None
+
+<-ArtistImageTree>
+    canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+            size: 32, 32
+            pos: self.x - 20, self.y + 4
+            
+<-ArtistImage>
+    canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+            #size: 32, 32
+            size: (self.parent.size[1]* .8, self.parent.size[1] * .8) if self.parent else (32,32)
+            pos: (self.x +5 , self.y + self.parent.size[1] * .1) if self.parent else (self.x +5, self.y + 2)
+            
+<-BgImage>
+    canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+            size: (self.parent.width - self.parent.width/4, self.parent.height - self.parent.height/4)
+            pos: (self.parent.x +self.parent.width/8, self.parent.y + self.parent.height/8)
+
+      
+<WaitingPopup>:
+    img: self.img
+    canvas:
+        Color:
+            rgba: (1, 1, 1, 1)
+        Rectangle:
+            texture: self.img.texture if self.img else None
+            size: self.size
+            pos: self.pos
+
+
+<TreeViewMedia>:
+    orientation: 'horizontal'
+    height: 40
+    text: self.text
+    img: self.img
+    url: self.url
+    md: self.metadata
+    canvas.before:
+        Rectangle:
+            pos: [self.parent.x, self.y] if self.parent else [0, 0]
+            size: [self.parent.width, self.height] if self.parent else [1, 1]
+    ArtistImageTree:
+        source: root.img
+        size_hint_x: .01
+    Label:
+        text: root.text
+    Button:
+        size_hint_x: 0.06
+        text: '+'
+        on_press:
+            app.root.mediaplayer.append_track(root.url, root.md)
+    Button:
+        size_hint_x: 0.06
+        text: '>'
+        on_press:
+            app.root.mediaplayer.replace_tracks(root.url, root.md)
+    Button:
+        size_hint_x: 0.06
+        text: '+>'
+        on_press:
+            d = app.root.mediaplayer.append_track(root.url, root.md)
+            d.addCallback(app.root.mediaplayer.play_id)
+
+[CustomListItem@SelectableView+BoxLayout]:
+    #orientation: 'horizontal'
+    size_hint_y: ctx.size_hint_y
+    height: (app.root.parent.height / 15) if app.root.parent.height > 600 else 50  
+    MyLib:
+        img: ctx.img
+        title: ctx.text
+        trackid: ctx.id
+        artist: ctx.artist if ctx.artist != '' else ctx.duration
+        fake: True
+        canvas.before:
+            Color: 
+                rgba: ctx.select
+            Rectangle:
+                pos: self.pos
+                size: self.width - 1, self.height - 1
+
+<ActionSpinnerOptions@SpinnerOption>
+    background_color: .4, .4, .4, 1
+
+<ActionSpinner@Spinner+ActionItem>
+    canvas.before:
+        Color:
+            rgba: 0.128, 0.128, 0.128, 1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    border: 27, 20, 12, 12
+    background_normal: 'atlas://data/images/defaulttheme/action_group'
+    option_cls: Factory.ActionSpinnerOptions
+                    
+<ServerItem>:
+    id: ti
+    text: ''
+    BoxLayout:
+        id: box
+        pos: root.pos
+        size: root.size
+        size_hint: 1, 1
+        orientation: 'vertical'
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint: (1, 0.05)
+            TextInput:
+                multiline: False
+                size_hint_x: 0.4
+                text: 'Search'
+            Button:
+                size_hint_x: 0.1
+                Image:
+                    y: self.parent.y
+                    x: self.parent.x
+                    allow_stretch: True
+                    size: self.parent.size
+                    source: 'data/icons/search.png'
+            Spinner:
+                size_hint_x: 0.5
+                text: 'All'
+                values: ['All', 'Video', 'Music', 'Pictures']
+        ScrollView:
+            id: scrollview
+            do_scroll_x: False
+            Scatter:
+                do_rotation: False
+                do_scale: False
+                do_translation: False
+                size: tree.size
+                size_hint_y: None
+                TreeView:
+                    id: tree
+                    width: scrollview.width
+                    height: self.minimum_height
+                    size_hint_y: None
+
+                    
+<VolPopUp>:
+    title: 'Volume'
+    size_hint: (.3, .8)
+    media: self.media
+    BoxLayout:
+        orientation: 'vertical'
+        Button:
+            size_hint: (1, .2)
+            text: '+'
+            on_press:
+                root.media.volup()
+        Slider:
+            size_hint: (1, .6)
+            orientation: 'vertical'
+            min: 0
+            max: root.media.volume_steps
+            value: root.media.volume
+            on_value:
+                root.media.setvol(int(args[1]))
+        Button:
+            size_hint: (1, .2)
+            text: '-'
+            on_press:
+                root.media.voldown()
+    
+        
+<Lights>:
+    Label:
+        text: 'Lights'
+
+<HVAC>:
+    Label:
+        text: 'HVAC'
+
+<Shutters>:
+    Label:
+        text: 'Shutters'
+    
+
+            

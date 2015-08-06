@@ -1,0 +1,438 @@
+#:kivy 1.8.0
+#:import KivyLexer kivy.extras.highlight.KivyLexer
+#:import Factory kivy.factory.Factory
+#:import ListItemButton kivy.uix.listview.ListItemButton
+#:import StackLayout kivy.uix.layout
+
+<TrackListDropDown>:
+	auto_width: False
+	size_hint_x: 0.5
+	pos_hint: {'x': 0.5}
+	id: tdd
+	auto_dismiss: False
+	#on_open:
+		#self.attach_to.register_tdd(self)
+	on_dismiss:
+		print('closed')
+		#if self.attach_to: self.attach_to.unregister_tdd()
+	on_select:
+		app.root.mediaplayer.call(args[1], self.attach_to.trackid)
+    Button:
+        text: 'Play'
+        size_hint_y: None
+        height: 44
+        on_release:
+        	root.select('play')
+    Button:
+        text: 'Remove'
+        size_hint_y: None
+        height: 44
+        on_release:
+        	root.select('remove')
+    Button:
+        text: 'Move'
+        size_hint_y: None
+        height: 44
+        on_release:
+        	root.select('move')
+
+
+<MyLib>:
+    deselected_color: [0.5, 0.5, 0.5, 0.4]
+    selected_color: [0, 0, 0, 0.4]
+    img: self.img
+    title: self.title
+    trackid: self.trackid
+    artist: self.artist
+    BoxLayout:
+		pos: self.parent.pos
+        size: self.parent.size
+        orientation: 'horizontal'
+        ArtistImage:
+			source: root.img
+            size_hint_x: 0.05
+            #width: 74
+        BoxLayout:
+        	orientation: 'vertical'
+        	size_hint_x: 0.95
+			Label:
+				bold: True
+				text: root.title
+        		size_hint_y: 0.6
+        	Label:
+        		halign: 'justify'
+        		italic: True
+				text: root.artist
+        		size_hint_y: 0.4
+	#TrackListDropDown:
+		#id: tdd
+		
+            
+  
+<ListView>:
+	container: container
+	ScrollView:
+        pos: root.pos
+        on_scroll_y: root._scroll(args[1])
+        do_scroll_x: False
+        bar_width: 10
+        scroll_wheel_distance: 120
+        #scroll_timeout: 10
+        #scroll_y: .9
+        GridLayout:
+            cols: 1
+            id: container
+            size_hint_y: None
+
+<-ArtistImageTree>
+	canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+            size: 32, 32
+            pos: self.x - 20, self.y + 4
+            
+<-ArtistImage>
+	canvas:
+        Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+            size: 32, 32
+            pos: self.x +5, self.y + 4
+            
+<-BgImage>
+	canvas:
+		Color:
+            rgb: (1, 1, 1)
+        Rectangle:
+            texture: self.texture
+            size: (self.parent.width - self.parent.width/4, self.parent.height - self.parent.height/4)
+            pos: (self.parent.x +self.parent.width/8, self.parent.y + self.parent.height/8)
+		
+<WaitingPopup>:
+	img: self.img
+	canvas:
+		Color:
+			rgba: (1, 1, 1, 1)
+		Rectangle:
+			texture: self.img.texture
+			size: self.size
+			pos: self.pos
+
+<TreeViewMedia>:
+	orientation: 'horizontal'
+	height: 40
+	text: self.text
+	img: self.img
+	url: self.url
+	md: self.metadata
+	canvas.before:
+        Rectangle:
+            pos: [self.parent.x, self.y] if self.parent else [0, 0]
+            size: [self.parent.width, self.height] if self.parent else [1, 1]
+    ArtistImageTree:
+    	source: root.img
+    	size_hint_x: .01
+    Label:
+    	text: root.text
+    Button:
+    	size_hint_x: 0.06
+    	text: '+'
+    	on_press:
+    		app.root.append_track(root.url, root.md)
+    Button:
+    	size_hint_x: 0.06
+    	text: '>'
+    	on_press:
+    		app.root.replace_tracks(root.url, root.md)
+    Button:
+    	size_hint_x: 0.06
+    	text: '+>'
+    	on_press:
+    		d = app.root.append_track(root.url, root.md)
+    		d.addCallback(app.root.play_id)
+
+[CustomListItem@SelectableView+BoxLayout]:
+	orientation: 'horizontal'
+    size_hint_y: ctx.size_hint_y
+    height: ctx.height
+    MyLib:
+    	img: ctx.img
+    	title: ctx.text
+    	trackid: ctx.id
+    	artist: ctx.artist if ctx.artist != '' else ctx.duration
+    	fake: True
+    	canvas.before:
+    		Color: 
+    			rgba: ctx.select
+    		Rectangle:
+    			pos: self.pos
+    			size: self.width - 1, self.height - 1
+
+<ActionSpinnerOptions@SpinnerOption>
+    background_color: .4, .4, .4, 1
+
+<ActionSpinner@Spinner+ActionItem>
+    canvas.before:
+        Color:
+            rgba: 0.128, 0.128, 0.128, 1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    border: 27, 20, 12, 12
+    background_normal: 'atlas://data/images/defaulttheme/action_group'
+    option_cls: Factory.ActionSpinnerOptions
+   
+<Controller>:
+	icon: 'data/icons/app_icon.png'
+	orientation: 'vertical'
+    canvas.before:
+        Color:
+            rgb: .6, .6, .6
+        Rectangle:
+            size: self.size
+            source: 'data/background.png'
+    ActionBar:
+        ActionView:
+            id: av
+            ActionPrevious:
+            	id: prev
+                title: 'Home'
+                app_icon: 'data/icons/app_icon.png'
+            ActionSpinner:
+            	id: active_renderer
+            	text: 'local'
+            	values: ['local']
+            	on_text:
+            		if app.root.mediaplayer.active_renderer != args[1]:\
+                    app.root.mediaplayer.register_renderer(args[1])
+            ActionSpinner:
+                id: menu
+                important: True
+                text: 'MediaPlayer'
+                values: root.menu_items
+                on_text:
+                    if root.sm.current != args[1]:\
+                    root.sm.current = args[1]
+                    
+<ServerItem>:
+	id: ti
+	text: ''
+	BoxLayout:
+		id: box
+	    pos: root.pos
+        size: root.size
+        size_hint: 1, 1
+        orientation: 'vertical'
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint: (1, 0.05)
+            TextInput:
+                multiline: False
+                size_hint_x: 0.4
+                text: 'Search'
+            Button:
+                size_hint_x: 0.1
+                Image:
+                    y: self.parent.y
+                    x: self.parent.x
+                    allow_stretch: True
+                    size: self.parent.size
+                    source: 'data/icons/search.png'
+            Spinner:
+                size_hint_x: 0.5
+                text: 'All'
+                values: ['All', 'Video', 'Music', 'Pictures']
+        ScrollView:
+            id: scrollview
+            #size_hint: (1, 1)
+            do_scroll_x: False
+            #size: (400, 400)
+            Scatter:
+                do_rotation: False
+                do_scale: False
+                do_translation: False
+                size: tree.size
+                size_hint_y: None
+                TreeView:
+                    id: tree
+                    width: scrollview.width
+                    height: self.minimum_height
+                    size_hint_y: None
+
+	                
+<MediaPlayer>:
+	bgimg:  self.bgimg
+	action: self.action
+	time: self.time
+	info: self.info
+    Carousel:
+        direction: 'left'
+        AnchorLayout:
+        	BgImage:
+            	size_hint: 0, 0
+            	source: root.bgimg
+	        Carousel:
+	            id: lists
+	            direction: 'bottom'
+	            BoxLayout:
+	            	orientation: 'vertical'
+	            	#BgImage:
+	            		#size_hint: 0, 0
+	            		#source: root.bgimg
+	            	ListView:
+	                	id: trackslist
+	                AnimatedTextButton:
+	                	id: playerstatus
+	                	_label: playerinfo
+	                	size_hint: (1, 0.1)
+	                	background_color: (.5,.5,.5,.5)
+	                	on_press:
+	                		lists.load_next()
+	                	RelativeLayout:
+	                		Label:
+	                			id: playerinfo
+	                			center_x: playerstatus.width/2
+	            				center_y: playerstatus.height/2
+	                			text: root.info
+	        	BoxLayout:
+	            	orientation: 'vertical'
+	            	#BgImage:
+	            		#size_hint: 0, 0
+	            		#source: root.bgimg
+	            	Button:
+	            		size_hint: (1, 0.1)
+	            		text: playerinfo.text + ' - ' + root.time
+	            		background_color: (.5,.5,.5,.5)
+	            		on_press:
+	            			lists.load_previous()
+	            	#Spinner:
+	            		#id: active_renderer
+	            		#size_hint: (1, 0.1)
+	            		#text: 'local'
+	            		#values: ['onDemand - rpi-toutoune.local', 'Bubble UPnP']
+	            		#on_text:
+	            			#if app.root.active_renderer != args[1]:\
+	                    	#app.root.register_renderer(args[1])
+	                Label:
+	                	text: ''
+		            Label:
+		            	size_hint: (1, 0.1)
+		            	text: root.time
+		            BoxLayout:
+		            	orientation: 'horizontal'
+		            	size_hint: (1, 0.2)
+		            	id: player
+		            	Button:
+		            		background_color: (.5,.5,.5,.5)
+		            		text: '<<'
+		            		on_press:
+		            			root.previous()
+		            	Button:
+		            		background_color: (.5,.5,.5,.5)
+		            		text: root.action
+		            		on_press:
+		            			root.playpause()
+		            	Button:
+		            		background_color: (.5,.5,.5,.5)
+		            		text: '>>'
+		            		on_press:
+		            			root.next()
+		TabbedPanel:
+            id: library
+        	do_default_tab: False
+        	on_current_tab:
+        		print('oh')
+        		root.register_server(args[1].text)
+        	TabbedPanelItem:
+        		text: 'Local'
+        		id: localserver
+        		BoxLayout:
+        			pos: root.pos
+        			size: root.size
+        			size_hint: None, None
+        			orientation: 'vertical'
+        			BoxLayout:
+						orientation: 'horizontal'
+						size_hint: (1, 0.05)
+						TextInput:
+							multiline: False
+							size_hint_x: 0.4
+							text: 'Search'
+						Button:
+							size_hint_x: 0.1
+							Image:
+								y: self.parent.y
+								x: self.parent.x
+								allow_stretch: True
+								size: self.parent.size
+								source: 'data/icons/search.png'
+						Spinner:
+							size_hint_x: 0.5
+							text: 'All'
+							values: ['All', 'Video', 'Music', 'Pictures']
+        			ScrollView:
+        				id: scrollview
+        				#size_hint: (1, 1)
+        				do_scroll_x: False
+        				#size: (400, 400)
+        				Scatter:
+        					do_rotation: False
+							do_scale: False
+							do_translation: False
+							size: treeLocal.size
+							size_hint_y: None
+							TreeView:
+								root_options:
+									{'text': 'Local', 'is_open': False}
+								id: treeLocal
+								width: scrollview.width
+								height: self.minimum_height
+								size_hint_y: None
+					
+		            
+<Settings>:
+    BoxLayout:
+        orientation: 'vertical'
+        id: settings
+        Spinner:
+        	id: settings_servers
+    		size_hint: (None, None)
+    		width: 200
+    		height: 40
+    		padding_left: 20
+    		self: root.get_servers()
+        Label:
+            text: 'test'
+        TabbedPanel:
+            id: library
+            do_default_tab: False
+            on_current_tab:
+            	print('oh')
+            	#app.root.register_server(args[1].text)
+            TabbedPanelItem:
+        		text: 'Local'
+        		id: localserver
+	        	ScrollView:
+					id: scrollview
+					#size_hint: (1, 1)
+					do_scroll_x: False
+					#size: (400, 400)
+					Scatter:
+						do_rotation: False
+						do_scale: False
+						do_translation: False
+						size: treeLocal.size
+						size_hint_y: None
+						TreeView:
+							root_options:
+								{'text': 'Local'}
+							id: treeLocal
+							width: scrollview.width
+							height: self.minimum_height
+							size_hint_y: None
+
+
+            
