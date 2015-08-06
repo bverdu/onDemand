@@ -82,7 +82,7 @@ def makeService(args):
                     ssdp_server.parent = mainService
                 if config.network in ('cloud', 'both'):
                     from spyne_plus.server.twisted.xmpp import XmppService
-                    xmppService = XmppService(device, user=config.cloud_user)
+                    xmppService = XmppService(device, user=config.cloud_user, secret=config.cloud_secret)
                     mainService.services.append(xmppService)
                     xmppService.parent = mainService
     return mainService

@@ -24,7 +24,9 @@ client_opts = 'addr=192.168.0.9, port=6600'
 clients = ['mprisclient', 'omxclient', 'mpdclient', 'control', 'mediaserver']
 shared_dirs = ['/home/babe/Projets/eclipse/onDemand/']
 network = 'lan'
-cloud_user = 'test@xmpp.bertrandverdu.me'
+cloud_user = 'test@xmpp.example.com'
+cloud_secret = 'test'
+
 
 # imports = '''
 # from onDemand.%s import %s

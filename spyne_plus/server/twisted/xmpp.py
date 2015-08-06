@@ -48,8 +48,8 @@ class XmppService(Service):
     timeout = True
     active_controllers = []
 
-    def __init__(self, device, user='test@xmpp.bertrandverdu.me',
-                 secret='test', userlist=[]):
+    def __init__(self, device, user='test@xmpp.example.com',
+                 secret='password', userlist=[]):
         self.description = None
         self.reactor = reactor
         self.user = user
