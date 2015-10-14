@@ -66,6 +66,7 @@ class Device(object):
         # SSDP
         self.bootID = None
         self.location = None
+        self.weburl = None
 
         #: :type: list of UPnP_Service
         self.services = []
@@ -81,6 +82,9 @@ class Device(object):
 
     def getLocation(self, address):
         return self.location % address
+
+    def getweburl(self, address):
+        return self.weburl % address
 
     def get_UDN(self):
         if self.uuid is None:

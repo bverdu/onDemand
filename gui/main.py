@@ -3,29 +3,34 @@
 '''
 Created on 5 mai 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
-import kivy
 import json
 import os
-from kivy.utils import platform
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
+import uuid
+
+import kivy
 from kivy.app import App
 from kivy.core.window import Window
+from kivy.logger import Logger
 from kivy.properties import ObjectProperty,\
     StringProperty, ListProperty, DictProperty
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import ScreenManager
+from kivy.utils import platform
+
 from widgets import StartPage, LightButton, PlayerButton, SettingPos,\
     SettingImg, Home, HVAC, Shutters, Scenarios, SensorPad  # @UnusedImport
-from kivy.logger import Logger
+
+
 from kivy.support import install_twisted_reactor
 install_twisted_reactor()
 
-from onDemand.controller import Controller as Oc  # @IgnorePep8
 from mediaplayer import MediaPlayer  # @IgnorePep8 @UnusedImport
-from onDemand.utils import FakeSensor
+from upnpy_spyne.controller import Controller as Oc  # @IgnorePep8
+from onDemand.utils import FakeSensor  # @IgnorePep8
 
 
 kivy.require('1.8.0')
@@ -60,9 +65,13 @@ class Controller(BoxLayout):
             self, searchables=[('upnp:rootdevice', self.on_device),
                                ('schemas-upnp-org:device:', self.on_device)],
             network='cloud',
-            cloud_user=('test@xmpp.example.com', 'test'))
+            cloud_user=('@'.join((self.app.cred['xmpp_user'],
+                                  self.app.cred['xmpp_server'])),
+                        self.app.cred['xmpp_pwd']),
+            logger=Logger,
+            uid=self.app.uuid)
         self.controller.startService()
-        for room, value in self.app.rooms.items():
+        for room, value in self.app.rooms.iteritems():
             if room != 'New':
                 self.rooms.update({room: {'devices': [], 'pic': value['pic']}})
         for item in self.menu_items:
@@ -80,6 +89,9 @@ class Controller(BoxLayout):
     def on_rooms(self, instance, value):
         self.ids.active_room.values = value
 
+    def resume(self):
+        self.set_room(self.active_room, force=True)
+
     def on_device(self, device):
 
         def on_product(product, device, typ):
@@ -94,7 +106,7 @@ class Controller(BoxLayout):
                 room = product.Room
                 name = device[device.keys()[0]]['name']
                 if name in self.app.devices:
-                        pos = self.app.devices[name]['pos']
+                    pos = self.app.devices[name]['pos']
                 else:
                     pos = '50*50'
 #                 name = product.Name
@@ -133,7 +145,7 @@ class Controller(BoxLayout):
                         self.home.children[0].roomlist = self.rooms
                         self.home.children[0].devices = self.devices
 
-        for name, infos in device.items():
+        for name, infos in device.iteritems():
             Logger.debug(name)
             room = False
             for service in infos['services']:
@@ -194,20 +206,22 @@ class Controller(BoxLayout):
                     self.app.config.set(infos['name'], 'room', room)
                     self.app.config.set(infos['name'], 'position', pos)
                 except KeyError:
-                    Logger.info('bad device: %s' % str(device))
+                    del self.devices[name]
+                    Logger.info('recreate device: %s' % str(device))
+                    self.on_device(device)
 
         if self.active_room == 'Home':
             if len(self.home.children) > 0:
                 self.home.children[0].roomlist = self.rooms
                 self.home.children[0].devices = self.devices
 
-    def set_room(self, room):
+    def set_room(self, room, force=False):
         print('room: %s' % room)
         if room in self.app.rooms:
             self.home.background = self.app.rooms[room]['pic']
 #             print(self.app.rooms[room]['pic'])
 #         print(s.ids)
-        if self.active_room == room:
+        if self.active_room == room and not force:
             print('1')
             s = self.home.children[0]
             nids = []
@@ -217,14 +231,14 @@ class Controller(BoxLayout):
                     if device['type'] == 'Lights':
                         b = LightButton(
                             name=device['name'],
-                            size=(self.height/10, self.height/10),
+                            size=(self.height / 10, self.height / 10),
                             size_hint=(None, None),
                             play=self.set_light,
                             config=self.app.config)
                     else:
                         b = PlayerButton(
                             name=device['name'],
-                            size=(self.height/10, self.height/10),
+                            size=(self.height / 10, self.height / 10),
                             size_hint=(None, None),
                             play=self.set_player,
                             config=self.app.config,
@@ -241,7 +255,7 @@ class Controller(BoxLayout):
                 if 'state' in self.devices[device['uid']]:
                     print('ooo')
                     s.ids[device['uid']].state = self.devices[
-                                                    device['uid']]['state']
+                        device['uid']]['state']
                 else:
                     print('iiii')
                     if device['type'] == 'Lights':
@@ -264,12 +278,12 @@ class Controller(BoxLayout):
                         self.update_light,
                         device['uid'])
                 else:
-                        self.controller.subscribe(
-                            {device['uid']: self.devices[device['uid']]},
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'TransportState',
-                            self.update_player,
-                            device['uid'])
+                    self.controller.subscribe(
+                        {device['uid']: self.devices[device['uid']]},
+                        'urn:av-openhome-org:service:Playlist:1',
+                        'TransportState',
+                        self.update_player,
+                        device['uid'])
                 if len(s.ids) > len(self.rooms[room]['devices']):
                     for w in s.children:
                         if w.id not in nids:
@@ -296,19 +310,19 @@ class Controller(BoxLayout):
                     #  b = NewLightButton(play=self.set_light)
                     b = LightButton(
                         name=device['name'],
-                        size=(self.height/10, self.height/10),
+                        size=(self.height / 10, self.height / 10),
                         size_hint=(None, None),
                         play=self.set_light,
                         config=self.app.config)
                     #  b.ids.light_name.text = device['name']
                 else:
                     b = PlayerButton(
-                            name=device['name'],
-                            size=(self.height/10, self.height/10),
-                            size_hint=(None, None),
-                            play=self.set_player,
-                            config=self.app.config,
-                            open=lambda: self.set_device(device))
+                        name=device['name'],
+                        size=(self.height / 10, self.height / 10),
+                        size_hint=(None, None),
+                        play=self.set_player,
+                        config=self.app.config,
+                        open=lambda: self.set_device(device))
                 b.id = device['uid']
                 b.device = {device['uid']: self.devices[device['uid']]}
                 if device['type'] == 'Lights':
@@ -317,11 +331,11 @@ class Controller(BoxLayout):
                         'Status', self.update_light, b.id)
                 else:
                     self.controller.subscribe(
-                            b.device,
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'TransportState',
-                            self.update_player,
-                            b.id)
+                        b.device,
+                        'urn:av-openhome-org:service:Playlist:1',
+                        'TransportState',
+                        self.update_player,
+                        b.id)
 #                     b.bind(on_press=lambda x: self.set_device(device))
                 if 'state' in self.devices[b.id]:
                     b.state = self.devices[b.id]['state']
@@ -347,9 +361,9 @@ class Controller(BoxLayout):
                 s.add_widget(b)
 #                 print(s.ids)
                 s.ids.update({b.id: b})
-            sensors = SensorPad(size=((self.width/7, self.height/5)
+            sensors = SensorPad(size=((self.width / 7, self.height / 5)
                                       if self.width > self.height
-                                      else (self.width/3, self.height/3)),
+                                      else (self.width / 3, self.height / 3)),
                                 size_hint=(None, None),
                                 pos=([self.width * .85, self.height * .7]
                                      if self.width > self.height
@@ -421,7 +435,7 @@ class Controller(BoxLayout):
             return
 
     def remove_device(self, uid):
-        for room, values in self.rooms.items():
+        for room, values in self.rooms.iteritems():
             for device in values['devices']:
                 if device['uid'] == uid:
                     self.rooms[room]['devices'].remove(device)
@@ -444,6 +458,8 @@ class Controller(BoxLayout):
 class KontrollerApp(App):
     sections = {}
     rooms = {}
+    cred = {}
+    uuid = ''
     devices = {}
     use_kivy_settings = False
     root = None
@@ -484,6 +500,14 @@ class KontrollerApp(App):
             'stype': 'path',
             'mediapath': defaultpath
         })
+        config.setdefaults('credentials', {
+            'cat': 'cred',
+            'name': 'Cloud server',
+            'xmpp_server': 'xmpp.example.org',
+            'xmpp_user': 'user',
+            'xmpp_pwd': 'password'
+        })
+        config.setdefaults('hidden', {'uuid': uuid.uuid4()})
 
     def build_settings(self, settings):
         settings.register_type('pos', SettingPos)
@@ -491,8 +515,9 @@ class KontrollerApp(App):
         devices = []
         rooms = []
         localsettings = []
+        credentials = []
 #         print('build settings: %s' % self.sections)
-        for s, v in self.sections.items():
+        for s, v in self.sections.iteritems():
             if 'cat' in v:
                 if v['cat'] == 'device':
                     devices.append({'type': 'title', 'title': v['name']})
@@ -535,6 +560,23 @@ class KontrollerApp(App):
                         'title': v['name'],
                         'section': s,
                         'key': 'mediapath'})
+                elif v['cat'] == 'cred':
+                    credentials.append({'type': 'title', 'title': v['name']})
+                    credentials.append({
+                        'type': 'string',
+                        'title': 'server address',
+                        'section': s,
+                        'key': 'xmpp_server'})
+                    credentials.append({
+                        'type': 'string',
+                        'title': 'user',
+                        'section': s,
+                        'key': 'xmpp_user'})
+                    credentials.append({
+                        'type': 'string',
+                        'title': 'password',
+                        'section': s,
+                        'key': 'xmpp_pwd'})
         if len(devices) > 0:
             confdev = json.dumps(devices)
             settings.add_json_panel('Devices',
@@ -549,6 +591,11 @@ class KontrollerApp(App):
             conflocals = json.dumps(localsettings)
             settings.add_json_panel('Local Settings',
                                     self.config, data=conflocals)
+        if len(credentials) > 0:
+            confcred = json.dumps(credentials)
+            settings.add_json_panel('Credentials',
+                                    self.config,
+                                    data=confcred)
 
     def update_conf(self, section, key, value):
         try:
@@ -560,6 +607,15 @@ class KontrollerApp(App):
         except:
             value = value
         open_ = False
+        if section == 'hidden':
+            if key == 'uuid':
+                self.uuid = value
+                self.config.write()
+#                 self.config.set(section, key, value)
+        if section == 'credentials':
+            if key.startswith('xmpp'):
+                print('key: %s -- value: %s' % (key, value))
+                self.cred.update({key: value})
         if section == 'Rooms':
             if key == 'names':
                 for v in value.split(','):
@@ -620,7 +676,7 @@ class KontrollerApp(App):
                 self.devices.update({section: {'name': section, 'room': room}})
             if self.root:
                 device = None
-                for r, v in self.root.rooms.items():
+                for r, v in self.root.rooms.iteritems():
                     if r == room:
                         continue
                     for d in v['devices']:
@@ -689,14 +745,16 @@ class KontrollerApp(App):
     def on_pause(self, *args, **kwargs):
         #         self.root.controller.clean()
         Logger.debug('on pause')
-        self.root.controller.stopService()
+        r = self.root.controller.clean()
+        print(r)
         return True
 
     def on_resume(self, *args, **kwargs):
-        self.root.controller.startService()
+        self.root.controller.resume()
+        self.root.resume()
 
     def clean_state(self, *args, **kwargs):
-        self.root.controller.clean()
+        self.root.controller.cleanfunc()
 
 
 if __name__ == '__main__':

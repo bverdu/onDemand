@@ -1,7 +1,7 @@
 '''
 Created on 6 jan. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import socket
 from twisted.python import usage

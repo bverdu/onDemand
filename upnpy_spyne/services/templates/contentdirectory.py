@@ -2,7 +2,7 @@
 '''
 Created on 18 mars 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 from spyne.decorator import rpc
 from spyne.service import ServiceBase

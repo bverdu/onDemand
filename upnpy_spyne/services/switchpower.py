@@ -1,10 +1,12 @@
 '''
 Created on 8 mai 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
-from twisted.python import log
+from twisted.logger import Logger
 from upnpy_spyne.services import Service
+
+log = Logger()
 
 
 class SwitchPower(Service):
@@ -27,6 +29,6 @@ class SwitchPower(Service):
 
     def upnp_event(self, evt, var):
         if hasattr(self, 'parent'):
-            log.err('%s Switch Power event: %s  ==> %s' % (
-                                        self.parent.friendlyName, var, evt))
+            log.debug('%s Switch Power event: %s  ==> %s' % (
+                self.parent.friendlyName, var, evt))
         setattr(self, var, evt)

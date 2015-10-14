@@ -35,6 +35,13 @@ try:
     i = tmp.index('-r')
     r = tmp.pop(i)
     reactor = tmp.pop(i)
+#     sys.argv[1:] = [r, reactor,
+#                     '--nodaemon',
+#                     '--pidfile',
+#                     ' ',
+#                     '--originalname',
+#                     '-n',
+#                     'onDemand']+tmp
     sys.argv[1:] = [l, d, r, reactor,
                     '--nodaemon',
                     '--pidfile',
@@ -43,8 +50,10 @@ try:
                     '-n',
                     'onDemand']+tmp
 except:
+#     sys.argv[1:] = ['-r', 'epoll', '--originalname',
+#                     '-n', 'onDemand'] + sys.argv[1:]
     sys.argv[1:] = ['-r', 'epoll', '--originalname',
-                    '--logger', 'onDemand.logger.standard',
+                    '--logger', 'onDemand.logger.info',
                     '-n', 'onDemand'] + sys.argv[1:]
 
 # import tracemalloc

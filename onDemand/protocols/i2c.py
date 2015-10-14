@@ -1,17 +1,14 @@
 # encoding: utf-8
 '''
-Created on 21 avr. 2015
+Created on 30 août 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
-import sys
 import smbus
 from zope.interface import implementer
+from twisted.logger import Logger
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.internet import interfaces, task, defer, reactor
-from twisted.internet.protocol import ClientFactory
-from twisted.python import log
-from onDemand.protocols import Client, Trigger
 
 
 @implementer(interfaces.IStreamClientEndpoint)
@@ -20,6 +17,7 @@ class Fake_HE_endpoint(object):
     clients = {}
 
     def __init__(self, reactor, bus_addr, addr, speed):
+        self.log = Logger()
         self.reactor = reactor
         self.bus_addr = bus_addr
         self.pair = addr
@@ -32,8 +30,8 @@ class Fake_HE_endpoint(object):
         if clientFactory.addr not in self.clients:
             self.clients.update({clientFactory.addr: proto})
         if not self.bus:
-                r = task.LoopingCall(self.check)
-                r.start(20)
+            r = task.LoopingCall(self.check)
+            r.start(20)
         clientFactory.doStart()
         return defer.succeed(None)
 
@@ -57,7 +55,7 @@ class Fake_HE_endpoint(object):
                 t.append(ord(n))
         else:
             raise Exception('too much data')
-        log.msg('send %s to i2c link' % t)
+        self.log.debug('send %s to i2c link' % t)
 
 
 @implementer(interfaces.IStreamClientEndpoint)
@@ -108,21 +106,21 @@ class HE_endpoint(object):
                 number.append(self.bus.read_byte(self.pair))
 #             number = self.bus.read_i2c_block_data(self.pair, 255, 10)
         except IOError:
-#             log.err('i2c Read IOError')
+            # log.err('i2c Read IOError')
             self.reading = False
             return
         else:
             self.reading = False
             l = ''.join([chr(code) for code in number]).strip().lstrip('0')
             if l[:-1] in self.clients:
-                log.err('i2c: %s' % l)
+                self.log.error('i2c: %s' % l)
                 self.clients[l[:-1]].lineReceived(l)
 
     def write(self, msg):
         if self.reading:
             reactor.callLater(0.1, self.write, msg)  # @UndefinedVariable
         self.writing = True
-        log.msg(msg)
+        self.log.debug(msg)
         t = []
         if len(msg) < 11:
             for n in msg:
@@ -132,7 +130,7 @@ class HE_endpoint(object):
         try:
             self.bus.write_i2c_block_data(self.pair, t[0], t[1:])
         except IOError:
-            log.err('i2c write IOError')
+            self.log.error('i2c write IOError')
         finally:
             self.writing = False
 
@@ -140,10 +138,11 @@ class HE_endpoint(object):
 class i2cProtocol(LineOnlyReceiver):
 
     def __init__(self):
+        self.log = Logger()
         self.__funcs = {}
 
     def connectionMade(self):
-        log.msg('i2c connected')
+        self.log.debug('i2c connected')
 
     def lineReceived(self, line):
         line = line.strip()
@@ -171,86 +170,5 @@ class i2cProtocol(LineOnlyReceiver):
         except KeyError:
             return
 
-
-class HE_factory(ClientFactory, Client):
-
-    actions = ('set_target', 'set_status')
-    room = 'Home'
-    status = False
-
-    def __init__(self, key='00000001', group=0):
-#         self.status = False
-        self.proto = i2cProtocol()
-        self.addr = ''.join((str(key), str(group),))
-        self.on_msg = ''.join((str(key), str(group), '1',))
-        self.off_msg = ''.join((str(key), str(group), '0',))
-        self.proto.factory = self
-
-    def doStart(self):
-        self.register_callback(self.addr, self.x_set_status)
-
-    def register_callback(self, name, func):
-        self.proto.addCallback(name, func)
-
-    def x_get_room(self):
-        return self.room
-
-    def x_set_target(self, value):
-#         log.msg(value)
-        if value is True:
-            self.proto.send_on()
-        else:
-            self.proto.send_off()
-        self.status = value
-        self.event(value, 'status')
-        log.err('event: %s value: %s' % ('status', value))
-
-    def x_get_target(self):
-        return self.status
-
-    def x_get_status(self):
-        return self.status
-
-    def x_set_status(self, status):
-        log.msg('%s --> %s' % (self.addr, int(status)))
-        self.status = status
-        self.event(status, 'status')
-
-    def event(self, evt, var):
-        pass
-
-
-class Fake_HE_factory(HE_factory):
-    pass
-
-
-def get_Fake_HE(bus=1, addr='0x04', speed=1, key='00000000', group=0):
-    f = HE_factory(key, group)
-    e = Fake_HE_endpoint(reactor, bus, addr, speed)
-    e.connect(f)
-    return e, f
-
-
-def get_HE(bus=1, addr='0x04', speed=1, key='00000000', group=0):
-    f = HE_factory(key, group)
-    f.status = False
-    e = HE_endpoint(reactor, int(bus), int(addr, 0), speed)
-    e.connect(f)
-    return e, f
-
 if __name__ == '__main__':
-    def show(*args):
-        print('triggered: %s' % args)
-    log.startLogging(sys.stdout)
-    f = HE_factory('16234266', 0)
-    f.on_set_target = [Trigger(5, show, 'set')]
-    e = Fake_HE_endpoint(reactor, 1, 0x04, 0)
-    e.connect(f)
-    onoff = False
-    for i in range(6):
-        reactor.callLater(  # @UndefinedVariable
-            i,
-            f.set_target,
-            not onoff)
-        onoff = not onoff
-    reactor.run()  # @UndefinedVariable
+    pass

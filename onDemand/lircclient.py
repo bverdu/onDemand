@@ -1,7 +1,7 @@
 '''
 Created on 22 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 from twisted.application import internet
 from onDemand.protocols.lirc import LircdFactory

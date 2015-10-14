@@ -1,18 +1,18 @@
 '''
 Created on 18 fev. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import sys
 import socket
 import uuid
-import time
 from urlparse import urlparse
 from lxml import etree as et
 from twisted.application import service, internet
-from twisted.python import log
-from twisted.internet import reactor, task, endpoints, defer
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.protocol import Factory
+from twisted.protocols import amp
+from twisted.logger import Logger
+from twisted.internet import reactor, task, endpoints, defer, threads
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
 from twisted.web import server, error as werror
@@ -25,14 +25,12 @@ from twisted.words.protocols.jabber.client import IQ
 from twisted.words.protocols.jabber.jid import JID, parse
 from spyne.application import Application
 from spyne.protocol.soap import Soap11
-from spyne.client import Service, RemoteProcedureBase, ClientBase
+from spyne.client import RemoteService, RemoteProcedureBase, ClientBase
 from spyne.client.twisted import _Producer, _Protocol
 from upnpy_spyne import ssdp
 from upnpy_spyne.utils import get_default_v4_address, XmlDictConfig
-import logging
 
-
-logger = logging.getLogger(__name__)
+# log = Logger()
 
 SSDP_ADDR_V4 = "239.255.255.250"
 SSDP_ADDR_V6 = "[FF05::C]"
@@ -45,17 +43,18 @@ class Controller(service.MultiService):
     binary_light_list = []
     hvac_list = []
     media_player_list = []
+    messager = None
     server_list = []
     shutter_list = []
     camera_list = []
     multiscreen_list = []
     dimmable_light_list = []
     ambi_light_list = []
-    searchables = {'upnp:rootdevice': log.msg}
     event_catcher = None
     cloud_event_catcher = None
     subscriptions = {}
     subscriptions_cloud = {}
+    searchables = {}
     ready_to_close = False
     current_device = None
     cloud = False
@@ -64,21 +63,37 @@ class Controller(service.MultiService):
 
     def __init__(
             self, parent=None, searchables=None, xmldir=None,
-            network='lan', cloud_user=None, cloud_servers=[]):
-        print('controller start')
+            network='lan', cloud_user=None, cloud_servers=[],
+            logger=None, uid=None, messager=None):
+        self.connected = False
+        self.messager = messager
+        self.app_paused = False
+        self.fail_count = 0
+        if not logger:
+            self.log = Logger()
+        else:
+            self.log = logger
+        self.log.debug('UPnP controller starts')
         self.xmldir = xmldir
-        self.devices = []
+        self.devices = {}
         self._services = {}
         self.parent = parent
-        self.uuid = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_DNS,
-                socket.gethostname()+'onDemand_Controller'))
+#         self.amp = ControllerAmp(self)
+        if uid:
+            self.uuid = uid
+        else:
+            self.uuid = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_DNS,
+                    socket.gethostname() + 'onDemand_Controller'))
         if searchables:
             for typ in searchables:
                 self.searchables.update({typ[0]: typ[1]})
 #                 print(self.searchables)
+        else:
+            self.searchables = {'upnp:rootdevice': self.log.debug}
         if network in ('lan', 'both'):
+            self.log.debug('UPnP classic enabled')
             self.lan = True
             self.listener = ssdp.SSDP_Listener(self)
             self.mcast = internet.MulticastServer(  # @UndefinedVariable
@@ -95,7 +110,7 @@ class Controller(service.MultiService):
 #             self.agent = Agent(reactor)
         if network in ('cloud', 'both'):
             if cloud_user:
-                print('cloud !')
+                self.log.debug('UPnP Cloud enabled')
                 self.cloud = True
                 self._jid, secret = cloud_user
                 self.users = {self._jid: {'state': True}}
@@ -121,58 +136,84 @@ class Controller(service.MultiService):
                 self.connector = endpoints.HostnameEndpoint(
                     reactor, jid.host, 5222)
                 self.factory = f
+#             factory = Factory()
+#             factory.protocol = ControllerAmp(self)
+#             amp_service = internet.TCPServer(  # @UndefinedVariable
+#                 4343, factory)
+#             amp_service.setServiceParent(self)
 #                 self.connector = SRVConnector(
 #                     reactor, 'xmpp-client', jid.host, f, defaultPort=5222)
-        log.startLogging(sys.stdout)
+#         log.startLogging(sys.stdout)
 
     def startService(self):
         '''
         '''
         service.MultiService.startService(self)
         if self.cloud:
-            log.msg('cloud Service starting')
             self.connector.connect(self.factory)
+            self.log.debug('Cloud Service started')
         if self.lan:
             t = task.LoopingCall(self.search_devices)
             t.start(15)
-            log.msg('SSDP Service started')
+            self.log.debug('SSDP Service started')
+
+    def resume(self):
+        self.app_paused = False
+        if not self.connected:
+            if self.cloud:
+                self.connector.connect(self.factory)
+                self.log.debug('Cloud Service started')
+            if self.lan:
+                t = task.LoopingCall(self.search_devices)
+                t.start(15)
+                self.log.debug('SSDP Service started')
 
     def stopService(self):
-        print('stopping...')
+        self.log.debug('Stopping controller service...')
         self.clean()
-        time.sleep(5)
+#         d.addCallback(lambda ignored: service.MultiService.stopService(self))
         service.MultiService.stopService(self)
 #         reactor.callLater(10, reactor.stop)  # @UndefinedVariable
 
     def cloud_disconnected(self, reason):
-        log.msg('cloud disconnected')
+        if not reason:
+            reason = 'Unknown'
+        self.log.warn('Cloud Server disconnected: %s' % reason)
+        self.connected = False
+        if not self.app_paused and self.fail_count < 10:
+            self.fail_count += 1
+            self.resume()
 
     def cloud_failed(self, failure):
-        print('Initialization failed.')
-        print(failure)
+        self.log.error('Cloud Login failed: %s' % str(failure))
 
-        self.xmlstream.sendFooter()
+#         self.xmlstream.sendFooter()
 
-    @inlineCallbacks
     def clean(self):
+        return reactor.callInThread(  # @UndefinedVariable
+            threads.blockingCallFromThread, *(reactor, self.cleanfunc))
+
+    def cleanfunc(self):
+
         def cleaned(res):
-            print('cleaned')
-            self.ready_to_close = True
+            self.log.debug('cleaned')
+            if self.cloud:
+                self.xmlstream.sendFooter()
         dl = []
         if self.lan:
-            for name in self.subscriptions:
+            for name in self.subscriptions.keys():
                 dl.append(self.unsubscribe(name))
         if self.cloud:
-            self.xmlstream.sendFooter()
-            for name in self.subscriptions_cloud:
+            for name in self.subscriptions_cloud.keys():
                 dl.append(self.unsubscribe(name))
         d = defer.DeferredList(dl)
         d.addCallback(cleaned)
-        r = yield d
-        print(r)
+        return d
 
     def cloud_connected(self, xs):
-        print 'Connected.'
+        self.log.debug('Cloud Connected')
+        self.fail_count = 0
+        self.connected = True
         self._services = {}
         self.subscriptions = {}
         self.xmlstream = xs
@@ -180,7 +221,7 @@ class Controller(service.MultiService):
 
     def authenticated(self, xs):
 
-        print "Authenticated."
+        self.log.debug('Cloud Authenticated')
         presence = domish.Element((None, 'presence'))
         xs.send(presence)
         xs.addObserver('/presence', self.on_presence)
@@ -209,7 +250,7 @@ class Controller(service.MultiService):
                 iq.send()
 
     def cloud_subscribe(self, jid, result):
-        print('Subscribe callback from %s' % jid)
+        self.log.debug('Subscribe callback from %s' % jid)
         presence = domish.Element((None, 'presence'))
         presence['type'] = 'subscribe'
         presence['to'] = jid
@@ -227,8 +268,8 @@ class Controller(service.MultiService):
                         last = child.children[0]
                 except KeyError:
                     return
-                print(message.toXml())
-                print(last.toXml())
+#                 print(message.toXml())
+#                 print(last.toXml())
                 self.cloud_event_catcher.receive(last.toXml().encode('utf-8'))
         elif message.children[0].name == 'event':
             evt = message.children[0]
@@ -246,7 +287,7 @@ class Controller(service.MultiService):
             % unicode(buf, 'utf-8').encode('ascii', 'replace'))
 
     def on_presence(self, resp):
-        print('got presence: %s' % resp.toXml().encode('utf-8'))
+        self.log.debug('got presence: %s' % resp.toXml().encode('utf-8'))
 #         print('from :%s' % resp['from'])
         user, host, res = parse(resp['from'])
         jid = '@'.join((user, host))
@@ -273,7 +314,7 @@ class Controller(service.MultiService):
                 return
         for child in resp.elements():
             if child.name == 'ConfigIdCloud':
-                print('Found UPnP Cloud device : %s type is: %s' % (
+                self.log.debug('Found UPnP Cloud device : %s type is: %s' % (
                     jid,
                     res))
                 info = IQ(self.xmlstream, 'get')
@@ -301,7 +342,7 @@ class Controller(service.MultiService):
                     xml=iq.children[0].children[0].toXml())
 
     def cloud_discovered(self, iq):
-        print('Discovered item: %s' % iq.toXml().encode('utf-8'))
+        self.log.debug('Discovered item: %s' % iq.toXml().encode('utf-8'))
         if iq['type'] == 'result':
             for child in iq.children:
                 if child.name == 'query':
@@ -347,14 +388,41 @@ class Controller(service.MultiService):
                     if typ in self.searchables:
                         self.update_devices(
                             uid, host['location'], self.searchables[typ])
-                        self.devices.append(uid)
+#                         self.devices.append(uid)
+
+    def send_message(self, message_type, name, id_, value):
+        if self.messager:
+            if isinstance(value, dict):
+                for k, v in value.iteritems():
+                    if not v or isinstance(v, dict):
+                        print('zap')
+                        continue
+                    print(v)
+                    self.messager.callRemote(message_type,
+                                             name=name,
+                                             id_=id_,
+                                             value=':'.join((k, v)))
+            else:
+                self.messager.callRemote(message_type,
+                                         name=name,
+                                         id_=id_,
+                                         value=value)
 
     def update_devices(self, uid, location, callback_fct, xml=None):
-        log.msg('new device %s: %s' % (uid, location))
+        def device_parsed(dic):
+            self.devices.update(dic)
+            if callable(callback_fct):
+                callback_fct(dic)
+            else:
+                self.send_message(Event, callback_fct, uid, dic[uid])
+                if self.messager:
+                    self.messager.parent.notify(
+                        'New Device detected:', dic[uid]['name'])
+        uid = bytes(uid)
+        self.log.debug('new device %s: %s' % (uid, location))
         if '@' in location:
-            print('cloud!')
             if xml:
-                callback_fct(self.parse_host(xml, location, uid))
+                device_parsed(self.parse_host(xml, location, uid))
                 return
         else:
             if not self.agent:
@@ -362,10 +430,11 @@ class Controller(service.MultiService):
             d = self.agent.request('GET', location)
             d.addCallback(readBody)
         d.addCallback(self.parse_host, *(location, uid))
-        d.addCallback(callback_fct)
+        d.addCallback(device_parsed)
 
     def parse_host(self, xml, location, uid):
         typ = 'upnp'
+        loc = None
         if '@' in location:
             url_prefix = ''.join(('xmpp://', location))
             net = 'cloud'
@@ -375,7 +444,7 @@ class Controller(service.MultiService):
         try:
             root = et.fromstring(xml)
         except:
-            log.err('bad xml: %s' % xml)
+            self.log.error('bad xml: %s' % xml)
             return {}
         host = {}
         icon = None
@@ -390,7 +459,7 @@ class Controller(service.MultiService):
                             typ = 'oh'
                     if att.tag.split('}')[-1] == 'iconList':
                         for ico in att:
-                            #  log.msg(ico)
+                            #  log.debug(ico)
                             for info in ico:
                                 if info.tag.split('}')[-1] == 'width':
                                     if int(info.text) <= 96:
@@ -418,6 +487,8 @@ class Controller(service.MultiService):
                                     d.update(
                                         {info.tag.split('}')[-1]: info.text})
                             svc.update({d['serviceType']: d})
+                    if att.tag.split('}')[-1] == 'X_location':
+                        loc = att.text
         host.update(
             {uid: {
                 'name': fname,
@@ -426,8 +497,9 @@ class Controller(service.MultiService):
                 'services': svc,
                 'type': typ,
                 'network': net,
-                'location': location}})
-#         log.msg(host)
+                'location': location,
+                'loc': loc}})
+#         log.debug(host)
         return host
 
     def subscribe(self, *args, **kwargs):
@@ -437,7 +509,10 @@ class Controller(service.MultiService):
             return self.subscribe_cloud(*args, **kwargs)
 
     def subscribe_classic(
-            self, device, svc, var, callback_fct=log.msg, callback_args=()):
+            self, device, svc, var, callback_fct=None,
+            callback_args=()):
+        if not callback_fct:
+            callback_fct = self.log.debug
         name = device.keys()[0]
         dev = device[name]
 
@@ -466,14 +541,14 @@ class Controller(service.MultiService):
             self.event_catcher.setServiceParent(self)
         subscription_id = '_'.join((name, svc.split(':')[-2]))
         childpath = '_'.join((subscription_id, 'event',))
-#         log.err(childpath)
+#         log.error(childpath)
         if childpath in self.event_catcher.catcher.childs:
             self.event_catcher.catcher.childs[childpath].update(
                 {var: (callback_fct, callback_args,)})
         else:
             self.event_catcher.catcher.childs.update(
                 {childpath: {var: (callback_fct, callback_args,)}})
-#         log.err(self.event_catcher.catcher.childs)
+#         log.error(self.event_catcher.catcher.childs)
         if subscription_id in self.subscriptions:
             for k, value in self.event_catcher.catcher.unfiltered.items():
                 if k == var:
@@ -490,7 +565,7 @@ class Controller(service.MultiService):
             return defer.succeed(None)
         else:
             self.subscriptions.update({subscription_id: {}})
-        clbk = '<'+'http://' + get_default_v4_address() + ':' +\
+        clbk = '<' + 'http://' + get_default_v4_address() + ':' +\
             str(self.event_catcher.getPort()) + '/' + childpath + '>'
 #             print(clbk)
         headers = {'HOST': [get_default_v4_address() + ':' +
@@ -499,9 +574,9 @@ class Controller(service.MultiService):
                    'NT': ['upnp:event'],
                    'TIMEOUT': ['Second-25']}
         if svc in dev['services']:
-            log.err(svc)
+            self.log.error(svc)
             addr = dev['services'][svc]['eventSubURL']
-            log.err(addr)
+            self.log.error(addr)
             d = self.agent.request(
                 'SUBSCRIBE',
                 addr,
@@ -512,13 +587,13 @@ class Controller(service.MultiService):
                 callbackArgs=(addr, headers['HOST'][0], subscription_id),
                 errbackArgs=(subscription_id,))
             return d
-#         log.err(dev['services'])
+#         log.error(dev['services'])
         return defer.fail(Exception('Service unknow'))
 
     def renew_subscription(self, sid):
 
         def renewed(res):
-            print('subscription %s successfully renewed' % sid)
+            #             print('subscription %s successfully renewed' % sid)
             reactor.callLater(  # @UndefinedVariable
                 20, self.renew_subscription, sid)
 
@@ -541,7 +616,7 @@ class Controller(service.MultiService):
                     return d
 
     def unsubscribe(self, name):
-        #         print('unsuscribe: %s' % name)
+        print('unsuscribe: %s' % name)
         deferreds = []
         if name in self.subscriptions:
             for host in self.subscriptions[name]:
@@ -553,7 +628,7 @@ class Controller(service.MultiService):
         if name in self.subscriptions_cloud:
             return self.unsubscribe_cloud(name)
         if len(deferreds) > 0:
-            print(deferreds)
+            #             print(deferreds)
             d = defer.DeferredList(deferreds)
         else:
             d = defer.succeed('nothing to do')
@@ -563,8 +638,9 @@ class Controller(service.MultiService):
 
         def unsubscribed(name, d, res):
             if res['type'] == 'result':
-                print('unsubscribed: %s' % name)
+                #                 print('unsubscribed: %s' % name)
                 del self.subscriptions_cloud[name]
+                print('ok')
                 d.callback(None)
             else:
                 d.errback(Exception(res.toXml()))
@@ -578,15 +654,15 @@ class Controller(service.MultiService):
         ps.addChild(unsubscribe)
         iq.addChild(ps)
         iq.addCallback(unsubscribed, name, d)
-        iq.send(to='pubsub.'+self.jid.host)
+        iq.send(to='pubsub.' + self.jid.host)
         return d
 
     def unsubscribe_host(self, sid, host, addr, name=None):
-        #  log.msg(
+        #  log.debug(
         #     'unsubscribe uuid host addr: %s %s %s' % (sid, host, addr))
 
         def unsubscribed(res):
-            print('subscription %s successfully cancelled' % sid)
+            #             print('subscription %s successfully cancelled' % sid)
             if name:
                 if len(self.subscriptions[name][host]) == 1:
                     del self.subscriptions[name]
@@ -603,10 +679,12 @@ class Controller(service.MultiService):
         return d
 
     def subscribe_cloud(
-            self, device, svc, var, callback_fct=log.msg, callback_args=()):
-        print('suscribe to %s' % var)
+            self, device, svc, var, callback_fct=None, callback_args=()):
+        #         print('suscribe to %s' % var)
         name = device.keys()[0]
         dev = device[name]
+        if not callback_fct:
+            callback_fct = self.log.debug
         d = defer.Deferred()
 
         def subscribe_failed(err, name):
@@ -615,7 +693,7 @@ class Controller(service.MultiService):
         def subscribed(node_name, deferred, iq):
             if iq['type'] == 'result':
                 self.subscriptions_cloud[str(node_name)] = True
-                print('%s suscribed !' % str(node_name))
+#                 print('%s suscribed !' % str(node_name))
 #                 iq = IQ(self.xmlstream, 'get')
 #                 ps = domish.Element(
 #                     ('http://jabber.org/protocol/pubsub', 'pubsub'))
@@ -633,10 +711,11 @@ class Controller(service.MultiService):
                                            % (node_name, iq.toXml())))
 
         if svc in dev['services']:
-            print('service %s ok' % svc)
-            print('subscriptions :%s' % self.subscriptions_cloud)
+            #             print('service %s ok' % svc)
+            #             print('subscriptions :%s' % self.subscriptions_cloud)
             if not self.cloud_event_catcher:
-                self.cloud_event_catcher = CloudEventCatcher({}, {})
+                self.cloud_event_catcher = CloudEventCatcher(
+                    {}, {}, logger=self.log)
             subscription_name = '/'.join((dev['location'], svc, var))
             #  subscription_service = svc
             if subscription_name in self.cloud_event_catcher.callbacks:
@@ -651,13 +730,13 @@ class Controller(service.MultiService):
 #             else:
 #                 self.cloud_event_catcher.callbacks.update(
 #                     {var: {var: (callback_fct, callback_args,)}})
-    #         log.err(self.event_catcher.catcher.childs)
+    #         log.error(self.event_catcher.catcher.childs)
             if subscription_name in self.subscriptions_cloud:
                 if self.subscriptions_cloud[subscription_name]:
-                    print('already subscribed: %s' % subscription_name)
+                    #                     print('already subscribed: %s' % subscription_name)
                     for k, value in\
                             self.cloud_event_catcher.unfiltered_dict.items():
-                        print('is %s == %s ?' % (k, var))
+                        #                         print('is %s == %s ?' % (k, var))
                         if k == var:
                             if value == 'False':
                                 value = False
@@ -682,18 +761,18 @@ class Controller(service.MultiService):
             ps.addChild(subscribe)
             iq.addChild(ps)
             iq.addCallback(subscribed, subscription_name, d)
-            iq.send(to='pubsub.'+self.jid.host)
+            iq.send(to='pubsub.' + self.jid.host)
             return d
         return defer.fail(Exception('Service unknow'))
 
     def get_client(self, device, service):
         if self.xmldir is not None:
-                client = None
+            client = None
         else:
             import importlib
             module_name = service.split(':')[-2]
             app = getattr(importlib.import_module(
-                'upnpy_spyne.services.templates.'+module_name.lower()),
+                'upnpy_spyne.services.templates.' + module_name.lower()),
                 module_name)
             if device['network'] == 'lan':
                 client = Client(
@@ -711,13 +790,17 @@ class Controller(service.MultiService):
                                 in_protocol=Soap11(xml_declaration=False),
                                 out_protocol=Soap11(xml_declaration=False)),
                     cloud=True)
-                print('**********%s' % service)
-                print(device['services'][service])
+#                 print('**********%s' % service)
+#                 print(device['services'][service])
         return client
 
     def call(self, device, service, func, params=()):
-        devname = device.keys()[0]
-        dev = device[devname]
+        if isinstance(device, dict):
+            devname = device.keys()[0]
+            dev = device[devname]
+        else:
+            devname = device
+            dev = self.devices[device]
         if devname not in self._services:
             client = self.get_client(dev, service)
             self._services.update({devname: {service: client.service}})
@@ -728,7 +811,8 @@ class Controller(service.MultiService):
             f = getattr(
                 self._services[devname][service], func)
         except AttributeError:
-            log.err('function %s not found for service %s' % (func, service))
+            self.log.error(
+                'function %s not found for service %s' % (func, service))
             return defer.fail(Exception(
                 'function %s not found for service %s' % (func, service)))
         try:
@@ -743,10 +827,123 @@ class Controller(service.MultiService):
             #  boolean has no len
             d = f(params)
         d.addErrback(
-            lambda failure, fname: log.err(
+            lambda failure, fname: self.log.error(
                 '%s call failed : %s' % (fname, failure.getErrorMessage())),
             func)
         return d
+
+
+class Call(amp.Command):
+    arguments = [('device', amp.String()),
+                 ('service', amp.String()),
+                 ('func', amp.String()),
+                 ('params', amp.ListOf(amp.String()))]
+    response = [('call_result', amp.ListOf(amp.Unicode()))]
+
+
+class GetDevices(amp.Command):
+    arguments = [('dev_type', amp.String())]
+    response = [('devices', amp.ListOf(amp.String()))]
+
+
+class DeviceInfo(amp.Command):
+    arguments = [('uuid', amp.String())]
+    response = [('name', amp.Unicode()),
+                ('type', amp.String()),
+                ('services', amp.ListOf(amp.String()))]
+
+
+class StartController(amp.Command):
+    arguments = [('search_type', amp.String()),
+                 ('search_name', amp.String()),
+                 ('network', amp.String()),
+                 ('cloud_user', amp.String()),
+                 ('cloud_pass', amp.String())]
+    response = [('started', amp.Boolean())]
+
+
+class Event(amp.Command):
+    arguments = [('name', amp.String()),
+                 ('id_', amp.String()),
+                 ('value', amp.Unicode())]
+    response = []
+
+
+class ControllerAmp(amp.AMP):
+
+    def __init__(self):
+        print('controllerAmp')
+        amp.AMP.__init__(self)
+        print('oooo')
+
+    def format_result(self, result):
+        print(result)
+        return {'result': result}
+
+    def connectionLost(self, reason):
+        print('bye....')
+        if self.parent.controller:
+            self.parent.controller.messager = None
+
+    @Call.responder
+    def call(self, *args, **kwargs):
+        if not self.parent.controller:
+            return
+        r = self.parent.controller.call(*args, **kwargs)
+        r.addCallback(self.format_result)
+        return {'call_result': r}
+
+    @GetDevices.responder
+    def get_devices(self, dev_type):
+        if not self.parent.controller:
+            return
+        l = []
+        for k, v in self.parent.controller.devices.iteritems():
+            if dev_type == '':
+                l.append(k)
+            elif v['devType'] == dev_type:
+                l.append(k)
+        return {'devices': l}
+
+    @DeviceInfo.responder
+    def device_info(self, uuid):
+        if not self.parent.controller:
+            return
+        dev = self.parent.controller.devices[uuid]
+        return {'name': dev['name'],
+                'type': dev['devType'],
+                'services': [s for s in dev['services'].keys()]}
+
+    @StartController.responder
+    def start_controller(self, search_type, search_name, network,
+                         cloud_user, cloud_pass):
+        print(cloud_user)
+        if self.parent.controller:
+            self.parent.controller.messager = self
+            return {'started': True}
+        print('startcontroller!')
+        if cloud_user == '' and network not in ('both, cloud'):
+            return {'started': False}
+        if search_type == '':
+            searchtype = 'upnp:rootdevice'
+        if search_name == '':
+            search_name = 'device'
+        try:
+            self.parent.controller = Controller(
+                searchables=[(search_type, search_name)], network=network,
+                cloud_user=(cloud_user, cloud_pass), messager=self)
+            print('1')
+            self.parent.controller.startService()
+            print('2')
+            return {'started': True}
+        except Exception as err:
+            print(err)
+            return {'started': False}
+
+    def subscribe(self, *args, **kwargs):
+        if not self.parent.controller:
+            return
+        return {'subscribe_result': self.controller.subscribe(*args, **kwargs)}
 
 
 class EventServer(internet.StreamServerEndpointService):
@@ -824,13 +1021,17 @@ class EventResource(Resource):
 
 class CloudEventCatcher(object):
 
-    def __init__(self, callbacks, unfiltered_dict):
+    def __init__(self, callbacks, unfiltered_dict, logger=None):
+        if not logger:
+            self.log = Logger()
+        else:
+            self.log = logger
         self.callbacks = callbacks
         self.unfiltered_dict = unfiltered_dict
 
     def receive(self, evt):
 
-        #         print('receive %s %s' % evt)
+        #         self.log.error('receive %s %s' % evt)
         node, data = evt
         root = et.XML(data)
         #         print(self.callbacks)
@@ -943,13 +1144,14 @@ class Custom_RemoteProcedure(RemoteProcedureBase):
 
 
 class Client(ClientBase):
+
     def __init__(self, url, app, cloud=False):
         super(Client, self).__init__(url, app)
         if cloud:
-            self.service = Service(
+            self.service = RemoteService(
                 Cloud_RemoteProcedure, url, app)
         else:
-            self.service = Service(Custom_RemoteProcedure, url, app)
+            self.service = RemoteService(Custom_RemoteProcedure, url, app)
 
 
 def filter_event(dic, varnames):
@@ -990,9 +1192,11 @@ def filter_event(dic, varnames):
 
 if __name__ == '__main__':
 
+    log = Logger()
+
     def test_2():
         from upnpy_spyne.services.templates.switchpower import SwitchPower
-        log.startLogging(sys.stdout)
+#         log.startLogging(sys.stdout)
         client = Client(
             'http://192.168.0.60:8000',
             Application([SwitchPower], SwitchPower.tns,
@@ -1001,7 +1205,7 @@ if __name__ == '__main__':
             out_header={'Content-Type': ['text/xml;charset="utf-8"'],
                         'Soapaction': [SwitchPower.tns]})
         d = client.service.GetStatus()
-        d.addCallback(log.msg)
+        d.addCallback(log.debug)
         onoff = False
         for i in range(6):
             reactor.callLater(  # @UndefinedVariable
@@ -1011,18 +1215,18 @@ if __name__ == '__main__':
             onoff = not onoff
 
     def show(*args):
-        log.err('Event %s ' % str(args))
+        log.error('Event %s ' % str(args))
 
     def show_product(res):
-        log.err(
+        log.error(
             '==== Product found: %s - %s ====='
             % (res.Name, res.Room,))
 
     def search(res):
         for name, device in res.items():
-            log.msg(name)
+            log.debug(name)
             for service in device['services']:
-                log.msg(service)
+                log.debug(service)
                 if service == u'urn:av-openhome-org:service:Product:1':
                     d = controller.call(res, service, 'Product')
                     d.addCallback(show_product)
@@ -1037,7 +1241,7 @@ if __name__ == '__main__':
     def test(controller):
         controller.startService()
         reactor.callLater(  # @UndefinedVariable
-            50, lambda: log.msg(controller.devices))
+            50, lambda: log.debug(controller.devices))
         reactor.callLater(  # @UndefinedVariable
             100, controller.stopService)  # @UndefinedVariable
     log.startLogging(sys.stdout)

@@ -29,10 +29,8 @@ class Device(object):
                  'version',
                  'uuid',
                  'datadir',
-                 'connectionManager',
-                 'avtransport',
-                 'renderingcontrol',
                  'services',
+                 'devices',
                  'namespaces',
                  'extras',
                  'serialNumber',
@@ -41,6 +39,7 @@ class Device(object):
                  '__dict__']
     version = (1, 0)
     # Description
+    deviceURL = ''
     deviceType = None
     manufacturer = "upnpy"
     manufacturerURL = "http://github.com/bverdu/upnpy"
@@ -51,37 +50,50 @@ class Device(object):
     modelURL = "http://github.com/bverdu/upnpy"
     serialNumber = None
     UPC = None
+    namespaces = {}
 
     _description = None
 
     # SSDP
     server = "Linux/x86_64 UPnP/1.0 upnpy/0.9"
 
-    def __init__(self):
+    def __init__(self, path):
+        self.extras = {}
         # Description
+        n = path.split('/')
+        self.friendlyName = self.name = n[-1]
+        if len(n) > 1:
+            #             self.namespaces.update(
+            #                 {'v': 'urn:schemas-ondemand-org:device-1-0'})
+            self.extras.update({'X_location': '/'.join(n[:-1])})
         self.configID = 0
         self.uuid = None
 
         # SSDP
         self.bootID = None
         self.location = None
+        self.weburl = None
 
         #: :type: list of UPnP_Service
         self.services = []
 
+        #: :type list of embedded Devices
+        self.devices = []
+
         #: :type: list of DeviceIcon
         self.icons = []
 
-        self.namespaces = {
+        self.namespaces.update({
             '': 'urn:schemas-upnp-org:device-1-0'
-        }
-
-        self.extras = {}
+        })
 
     def getLocation(self, address):
         if '@' in self.location:
             return self.location
         return self.location % address
+
+    def getweburl(self, address):
+        return self.weburl % address
 
     def get_UDN(self):
         if self.uuid is None:
@@ -95,7 +107,7 @@ class Device(object):
 #             'configId': str(self.configID)
 #         })
         root = et.Element('root', {'encoding': 'utf-8', 'standalone': 'yes'})
-        for prefix, namespace in self.namespaces.items():
+        for prefix, namespace in self.namespaces.iteritems():
             if prefix == '':
                 prefix = 'xmlns'
             else:
@@ -131,16 +143,16 @@ class Device(object):
                 if val is not None:
                     device.append(make_element(attr_name, val))
 
-        for name, val in self.extras.items():
+        for name, val in self.extras.iteritems():
             device.append(make_element(name, val))
 
-        # iconList
+        # icon List
         iconList = et.Element('iconList')
         for icon in self.icons:
             iconList.append(icon.dump())
         device.append(iconList)
 
-        # serviceList
+        # service List
         serviceList = et.Element('serviceList')
         for service in self.services:
             _service = et.Element('service')
@@ -156,17 +168,36 @@ class Device(object):
             serviceList.append(_service)
         device.append(serviceList)
 
+        # device List
+        if len(self.devices) > 0:
+            deviceList = et.Element('deviceList')
+            for device_ in self.devices:
+                _device = et.Element('device')
+                _device.append(make_element('rootType', device_.deviceType))
+                _spec_version = et.Element('specVersion')
+                _spec_version.append(
+                    make_element('major', str(device_.version[0])))
+                _spec_version.append(
+                    make_element('minor', str(device_.version[1])))
+                _device.append(_spec_version)
+                _device.append(make_element(
+                    'baseURL',
+                    '/' + device_.deviceUrl))
+            deviceList.append(_device)
+            device.append(deviceList)
+
         return device
 
     def dumps(self, force=False):
         if self._description is None or force:
-#             log.err('generate xml')
+            #             log.err('generate xml')
             self._description = '<?xml version="1.0"?>' + \
-                                          et.tostring(self.dump())
+                et.tostring(self.dump())
         return self._description
 
 
 class DeviceIcon:
+
     def __init__(self, mimetype, width, height, depth, url):
         self.mimetype = mimetype
         self.width = width

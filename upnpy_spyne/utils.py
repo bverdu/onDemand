@@ -2,7 +2,7 @@
 '''
 Created on 5 sept. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 import urlparse
@@ -15,39 +15,9 @@ from base64 import b64encode, b64decode
 from mimetypes import guess_type
 import upnpy_spyne
 
-# class soapConfig(SOAPConfig):
-#     __slots__ = ['debug',
-#                  'argsOrdering',
-#                  'schemaNamespaceURI',
-#                  'typesNamespaceURI',
-#                  'strictNamespaces',
-#                  'dumpmap',
-#                  'typed',
-#                  'buildWithNamespacePrefix',
-#                  'buildWithGlobalNamespacePrefix',
-#                  '__dict__']
-# 
-#     def __init__(self, actions, debug=0):
-#         SOAPConfig.__init__(self)
-#         self.typed = 0
-#         self.debug = debug
-#         self.argsOrdering = self.get_actions_order(actions)
-# 
-#     def get_actions_order(self, actions):
-#         d = {}
-#         for k, v in actions.items():
-#             args = []
-#             for arg in v:
-#                 if arg.direction == 'out':
-#                     args.append(arg.name)
-#             if len(args) > 0:
-#                 d['%sResponse' % k] = args
-# #         print(d)
-#         if len(d) > 0:
-#             return d
-
 
 class XmlListConfig(list):
+
     def __init__(self, aList):
         for element in aList:
             if element:
@@ -78,6 +48,7 @@ class XmlDictConfig(dict):
 
     And then use xmldict for what it is... a dict.
     '''
+
     def __init__(self, parent_element):
         if parent_element.items():
             self.update(dict(parent_element.items()))
@@ -126,7 +97,7 @@ class XmlDictConfig(dict):
 #                 print(d)
                 d.update({'text': element.text})
                 if element.tag in self.keys():
-                    self.update({element.tag+'1': d})
+                    self.update({element.tag + '1': d})
                 else:
                     self.update({element.tag: d})
             # finally, if there are no child tags and no attributes, extract
@@ -135,7 +106,7 @@ class XmlDictConfig(dict):
                 if len(element.tag.split('}')) > 0:
                     element.tag = element.tag.split('}')[-1]
                 if element.tag in self.keys():
-                    self.update({element.tag+'1': element.text})
+                    self.update({element.tag + '1': element.text})
                 else:
                     self.update({element.tag: element.text})
 
@@ -156,7 +127,7 @@ def http_parse_raw(data):
         elif x > 0 and lines[x].strip() != '':
             sep = lines[x].index(':')
             hk = lines[x][:sep].lower()
-            hv = lines[x][sep+1:].strip()
+            hv = lines[x][sep + 1:].strip()
 
             if hk in headers.keys():
                 headers[hk] = [headers[hk], hv]
@@ -246,10 +217,10 @@ def make_event(evt, schema=None):
 #                     key: str(item['value'][key]) for key in item['value']}))
     if evt['evtype'] != 'last_change':
         try:
-            ret.append((evt['evtype']+'_value',
+            ret.append((evt['evtype'] + '_value',
                         str(item['value']['text'])))
         except KeyError:
-            ret.append((evt['evtype']+'_value', str(item['value']['val'])))
+            ret.append((evt['evtype'] + '_value', str(item['value']['val'])))
     if schema is not None:
         event.append(inst)
     else:
@@ -277,7 +248,7 @@ def didl_decode(didl_str):
     root = et.XML(didl_str)
 #     t = XmlDictConfig(root[0])
     for item in root:
-#         x = et.Element('DIDL-Lite')
+        #         x = et.Element('DIDL-Lite')
         x = e('DIDL-Lite', item)
 #         x.append(item)
         md = et.tostring(x)
@@ -318,14 +289,16 @@ def didl_encode(dics):
     dc = ['title', 'rights', 'type', 'description', 'date', 'creator']
     res = ['duration', 'protocolInfo', 'sampleFrequency', 'nrAudioChannels',
            'size', 'resolution']
-    defaultns = ElementMaker(nsmap={
+    defaultns = ElementMaker(nsmap={  # @UnusedVariable
         None: 'urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/',
         'dc': 'http://purl.org/dc/elements/1.1/',
         'upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'})
-    dcns = ElementMaker(nsmap={'dc': 'http://purl.org/dc/elements/1.1/'})
-    upnpns = ElementMaker(nsmap={
+    dcns = ElementMaker(  # @UnusedVariable
+        nsmap={'dc': 'http://purl.org/dc/elements/1.1/'})
+    upnpns = ElementMaker(nsmap={  # @UnusedVariable
         'upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'})
-    dlnans = ElementMaker(nsmap={'dlna': 'urn:schemas-dlna-org:metadata-1-0/'})
+    dlnans = ElementMaker(  # @UnusedVariable
+        nsmap={'dlna': 'urn:schemas-dlna-org:metadata-1-0/'})
 #     x = defaultns('DIDL-Lite')
     x = et.Element(
         'DIDL-Lite',
@@ -340,10 +313,10 @@ def didl_encode(dics):
                                   'parentID': 'qwertyuiop',
                                   'restricted': '1'})
         if 'title' in dic.keys():
-#             t = dcns('title')
+            #             t = dcns('title')
             t = et.SubElement(
                 i,
-                DC+'title')
+                DC + 'title')
             try:
                 t.text = dic['title'].decode('utf-8')
             except:
@@ -365,10 +338,10 @@ def didl_encode(dics):
                         typ = 'videoItem'
                 except:
                     typ = 'videoidem'
-                t = et.Element(UPNP+'class')
-#                 t = et.Element(
-#                     'upnp:class',
-#                     {'xmlns:upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'})
+                t = et.Element(UPNP + 'class')
+#               t = et.Element(
+#                   'upnp:class',
+#                   {'xmlns:upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'})
                 t.text = ''.join(('object.item.', typ))
                 i.insert(1, t)
                 try:
@@ -377,7 +350,7 @@ def didl_encode(dics):
                     r.text = dic[k]
 #                 log.err(r.text)
             elif k in dc:
-                el = et.Element(DC+k)
+                el = et.Element(DC + k)
                 try:
                     el.text = dic[k].decode('utf-8')
                 except:
@@ -387,21 +360,24 @@ def didl_encode(dics):
                 if k == 'class':
                     continue
                 attr = {}
-                map = {'upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'}
+                map = {  # @ReservedAssignment
+                    'upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'}
                 if k == 'albumArtURI':
                     albumuri = dic[k]
+                    if not albumuri:
+                        continue
                     if albumuri.split('.')[-1].lower() in ('jpg', 'jpeg'):
                         profileid = 'JPEG_TN'
                     else:
                         profileid = albumuri.split('.')[-1].upper() + '_TN'
-                    attr.update({DLNA+'profileID': profileid})
+                    attr.update({DLNA + 'profileID': profileid})
                     map.update({'dlna': 'urn:schemas-dlna-org:metadata-1-0/'})
-#                     attr.update(
-#                         {'dlna:profileID': profileid,
-#                          'xmlns:dlna': 'urn:schemas-dlna-org:metadata-1-0/'})
-#                 attr.update(
-#                     {'xmlns:upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'})
-                el = et.Element(UPNP+k, attrib=attr, nsmap=map)
+#                   attr.update(
+#                       {'dlna:profileID': profileid,
+#                        'xmlns:dlna': 'urn:schemas-dlna-org:metadata-1-0/'})
+#               attr.update(
+#                   {'xmlns:upnp': 'urn:schemas-upnp-org:metadata-1-0/upnp/'})
+                el = et.Element(UPNP + k, attrib=attr, nsmap=map)
 #                 el = upnpns(k, {dlnans('profileID'): profileid})
                 try:
                     el.text = dic[k].decode('utf-8')
@@ -415,7 +391,7 @@ def didl_encode(dics):
 
 
 def dict2xml(d):
-#     print(d)
+    #     print(d)
     children = []
     xml = ''
     root = None
@@ -433,7 +409,7 @@ def dict2xml(d):
                      str(int(value))) + '</' + key + '>'
     else:
         for value in d:
-                children.append(dict2xml(value))
+            children.append(dict2xml(value))
     if len(children) > 0:
         suffix = ''
         xml = ''
@@ -441,7 +417,7 @@ def dict2xml(d):
             xml = '<' + root + '>'
             suffix = '</' + root + '>'
         for child in children:
-                xml += child
+            xml += child
         xml += suffix
     return xml
 
@@ -459,7 +435,7 @@ def id_array_decode(idarray):
     if not isinstance(idarray, str):
         idarray = str(idarray.encode('utf-8'))
     return [int(unpack('>I', i)[0]) for i in map(
-        ''.join, zip(*[iter(b64decode(idarray))]*4))]
+        ''.join, zip(*[iter(b64decode(idarray))] * 4))]
 #     t = []
 #     for i in map(''.join, zip(*[iter(b64decode(idarray))]*4)):
 #         t.append(unpack('>I', i)[0])
@@ -489,8 +465,8 @@ if __name__ == '__main__':
     t = didl_decode(test)
     print(t)
     print(t[0]['metadata'])
-    print('\n'+test)
-    print('\n'+didl_encode(t))
+    print('\n' + test)
+    print('\n' + didl_encode(t))
 #     test2 = {'xesam:title': 'toto'}
 #     r = mpris_decode(test2)
 #     print('\n\n'+str(r))

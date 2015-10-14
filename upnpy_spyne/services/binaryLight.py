@@ -1,18 +1,18 @@
 '''
 Created on 10 avr. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 from spyne.application import Application
 from spyne.protocol.soap import Soap11
 from upnpy_spyne.services.templates.switchpower import SwitchPower
-from onDemand.protocols import he
 
 
 class BinaryLight(object):
     '''
     classdocs
     '''
+
     def __init__(self, client):
         def _map_context(ctx):
             ctx.udc = UserDefinedContext(client)
@@ -34,6 +34,7 @@ if __name__ == '__main__':
     from twisted.internet import reactor
     from spyne.server.twisted import TwistedWebResource
     from twisted.web.server import Site
+    from onDemand.plugins import he
 #     logging.basicConfig(level=logging.DEBUG)
 #     logging.getLogger('spyne.protocol.xml').setLevel(logging.DEBUG)
 

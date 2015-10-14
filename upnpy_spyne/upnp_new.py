@@ -1,11 +1,11 @@
 '''
 Created on 26 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 import time
-
+import logging
 from spyne_plus.application import Application
 from spyne_plus.protocol.soap import Soap11
 from spyne_plus.server.twisted import TwistedWebResource
@@ -63,7 +63,7 @@ class UPnPService(StreamServerEndpointService):
                 self.device.getLocation(
                     get_default_v4_address()) + '/pictures/icon.png')
             ]
-        log.msg('UPnP Service Started', loglevel='info')
+        log.msg('UPnP Service Started', loglevel=logging.INFO)
 
 
 class ServeResource(Resource):
@@ -80,9 +80,9 @@ class ServeResource(Resource):
         log.msg(
             'request method: %s proto = %s' % (
                 request.method, request.clientproto),
-            loglevel='debug')
+            loglevel=logging.DEBUG)
         request.clientproto = 'HTTP/1.1'
-        log.msg('Rendering Resource: %s' % self.data, loglevel='debug')
+        log.msg('Rendering Resource: %s' % self.data, loglevel=logging.DEBUG)
         return self.data
 
 
@@ -108,7 +108,7 @@ class ServiceResource(Resource):
 
         log.msg(
             "unhandled request (%s) %s" % (self.service.serviceType, path),
-            loglevel='info')
+            loglevel=logging.INFO)
         return Resource()
 
 
@@ -161,11 +161,11 @@ class ServiceEventResource(Resource):
             log.msg("unsupported: (%s) %s" % (
                 self.service.serviceType,
                 request.method),
-                loglevel='debug')
+                loglevel=logging.DEBUG)
             raise e
 
     def render_SUBSCRIBE(self, request):
-        log.msg("(%s) SUBSCRIBE" % self.service.serviceType, loglevel='debug')
+        log.msg("(%s) SUBSCRIBE" % self.service.serviceType, loglevel=logging.DEBUG)
 #         snapshot = tracemalloc.take_snapshot()
 #         top_stats = snapshot.statistics('lineno')
 #         print("[ Top 50 ]")
@@ -181,10 +181,10 @@ class ServiceEventResource(Resource):
 #                 self.service.subscriptions[sid].last_subscribe = time.time()
 #                 self.service.subscriptions[sid].expired = False
                 log.msg("(%s) Successfully renewed subscription" %
-                        self.service.serviceType, loglevel='debug')
+                        self.service.serviceType, loglevel=logging.DEBUG)
             else:
                 log.msg("(%s) Received invalid subscription renewal" %
-                        self.service.serviceType, loglevel='debug')
+                        self.service.serviceType, loglevel=logging.DEBUG)
         else:
             # New Subscription
             #  nt = self._parse_nt(getHeader(request, 'nt'))
@@ -193,7 +193,7 @@ class ServiceEventResource(Resource):
             log.msg(
                 "New subscription: (%s) %s %s" % (
                     self.service.serviceType, callback, timeout),
-                loglevel='info')
+                loglevel=logging.INFO)
             responseHeaders = self.service.subscribe(callback, timeout)
             if responseHeaders is not None and type(responseHeaders) is dict:
                 for name, value in responseHeaders.items():
@@ -203,7 +203,7 @@ class ServiceEventResource(Resource):
                 log.err("(%s) SUBSCRIBE FAILED" % self.service.serviceType)
 
     def render_UNSUBSCRIBE(self, request):
-        log.msg("(%s) UNSUBSCRIBE" % self.service.serviceType, loglevel='info')
+        log.msg("(%s) UNSUBSCRIBE" % self.service.serviceType, loglevel=logging.INFO)
 
         if request.requestHeaders.hasHeader('sid'):
             # Cancel
@@ -214,16 +214,16 @@ class ServiceEventResource(Resource):
                 log.msg(
                     "(%s) Successfully unsubscribed" %
                     self.service.serviceType,
-                    loglevel='debug')
+                    loglevel=logging.DEBUG)
             else:
                 log.msg(
                     "(%s) Received invalid UNSUBSCRIBE request" %
                     self.service.serviceType,
-                    loglevel='debug')
+                    loglevel=logging.DEBUG)
         else:
             log.msg("(%s) Received invalid UNSUBSCRIBE request" %
                     self.service.serviceType,
-                    loglevel='debug')
+                    loglevel=logging.DEBUG)
         return ''
 
 
@@ -243,7 +243,7 @@ class UPnP(Resource):
     def stop(self):
         if not self.running:
             return
-        log.msg("Stopping UPnP Service", loglevel='info')
+        log.msg("Stopping UPnP Service", loglevel=logging.INFO)
         self.site_port.stopListening()
         self.running = False
 
@@ -251,7 +251,7 @@ class UPnP(Resource):
         # Hack to fix twisted not accepting absolute URIs
         #   path, request = twisted_absolute_path(path, request)
         log.msg("upnp request: path:%s Request:%s" % (path, request),
-                loglevel='debug')
+                loglevel=logging.DEBUG)
         if path == '':
             return ServeResource(self.device.dumps(), 'text/xml')
 
@@ -259,7 +259,7 @@ class UPnP(Resource):
             if path == service.serviceUrl:
                 return ServiceResource(service)
 
-        log.msg("unhandled request %s" % path, loglevel='debug')
+        log.msg("unhandled request %s" % path, loglevel=logging.DEBUG)
         return Resource()
 
 

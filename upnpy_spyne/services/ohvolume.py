@@ -1,9 +1,9 @@
 '''
 Created on 22 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
-from twisted.python import log
+from twisted.logger import Logger
 from upnpy_spyne.services import Service
 
 
@@ -19,6 +19,7 @@ class Volume(Service):
         super(Volume, self).__init__(
             self.type, self.serviceType, xml=xmlfile,
             client=client, appname=name)
+        self.log = Logger()
         self.client = client
         self.client.oh_eventVOLUME = self.upnp_event
         self.volumemax = self.client.max_volume
@@ -33,5 +34,5 @@ class Volume(Service):
         self.mute = 0
 
     def upnp_event(self, evt, var):
-        log.msg('volume event: %s  ==> %s' % (var, evt))
+        self.log.debug('volume event: %s  ==> %s' % (var, evt))
         setattr(self, var, evt)

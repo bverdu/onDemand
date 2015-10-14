@@ -2,7 +2,7 @@
 '''
 Created on 1 avr. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import os
 import collections
@@ -12,6 +12,7 @@ from lxml import etree as et
 from twisted.internet import reactor, defer
 from kivy.logger import Logger
 from kivy.clock import Clock
+from kivy.loader import Loader
 from kivy.metrics import dp
 from kivy.uix.screenmanager import Screen
 from kivy.properties import ObjectProperty, StringProperty, ListProperty,\
@@ -31,6 +32,9 @@ from kivy.uix.image import AsyncImage, Image
 from onDemand import config, utils
 from upnpy_spyne.utils import didl_decode, id_array_decode, XmlDictConfig
 
+Loader.num_workers = 4
+Loader.loading_image = 'data/icons/wait.zip'
+
 CDS = 'urn:schemas-upnp-org:service:ContentDirectory:1'
 PLAYLIST = 'urn:av-openhome-org:service:Playlist:1'
 VOLUME = 'urn:av-openhome-org:service:Volume:1'
@@ -47,11 +51,7 @@ class MediaPlayer(Screen):
     track_list = ListProperty([])
     server_list = ListProperty([])
     renderer_list = ListProperty([])
-#     action = StringProperty('>')
     bgimg = StringProperty('data/icons/background_icon2.png')
-#     bgimg = StringProperty(
-#         'http://www.gqmagazine.fr/uploads/images/thumbs/201445/83/' +
-#         '2001__l_odyss__e_de_l_espace_5047.jpeg_north_780x_white.jpg')
     track_list = ListProperty([])
     track_dict = DictProperty()
     time_ = StringProperty('0:00:00')
@@ -99,14 +99,6 @@ class MediaPlayer(Screen):
                 'artist': val.artist,
                 'duration': val.duration,
                 'select': val.color}
-#     args_converter = lambda idx, inst, val: {'text': val.title,
-#                                              'id': val.id,
-#                                              'img': val.arturl,
-#                                              'size_hint_y': None,
-# #                                              'height': 40,
-#                                              'artist': val.artist,
-#                                              'duration': val.duration,
-#                                              'select': val.color}
 
     def __init__(self, **kwargs):
         if 'controller' in kwargs:
@@ -119,7 +111,6 @@ class MediaPlayer(Screen):
             del kwargs['main_ui']
         super(MediaPlayer, self).__init__(**kwargs)
         self.track_list = []
-#         print(type(self.track_list))
         self.list_tracks = DictAdapter(
             data=self.tracks_info,
             sorted_keys=self.sorted_tracks,
@@ -152,16 +143,14 @@ class MediaPlayer(Screen):
                     'urn:av-openhome-org:service:Playlist:1',
                     'TransportState',
                     self.on_oh_tstate)
+                if len(self.controller.subscriptions_cloud) < 2:
+                    Logger.debug('resubscribe')
+                    self.get_subscriptions(uid)
                 if self.pop:
                     self.popup.dismiss()
             for server in self.controller.parent.mediaservers:
                 if server not in self.server_list:
                     self.server_list.append(server)
-#             d = self.controller.call(
-#                 self.device,
-#                 PLAYLIST,
-#                 'Id')
-#             d.addCallback(self.on_id)
             d = self.controller.call(
                 self.device,
                 PLAYLIST,
@@ -172,14 +161,14 @@ class MediaPlayer(Screen):
                 PLAYLIST,
                 'Id')
             dd.addCallback(self.on_id)
-#             d.addCallback(lambda res: self.on_id(res.Value))
 
     def update_time(self, repeat):
-#         print('update time')
+        #         print('update time')
         def on_time(res):
-#             print('time result: %s' % res)
-            self.on_track_duration(res.Duration)
-            self._timer.set(res.Seconds)
+            #             print('time result: %s' % res)
+            if res:
+                self.on_track_duration(res.Duration)
+                self._timer.set(res.Seconds)
         if not self._timer:
             self._timer = Timer(self.on_seconds)
         d = self.controller.call(
@@ -207,22 +196,30 @@ class MediaPlayer(Screen):
         if value > 0:
             if self.selected in self.tracks_info:
                 s = self.tracks_info[self.selected]
-                if s.arturl != 'data/image-loading.gif':
-                    self.bgimg = s.arturl
+#                 if s.arturl != 'data/image-loading.gif':
+#                     self.bgimg = s.arturl
             else:
                 self.generate_empty_dict([value])
                 s = self.tracks_info[self.selected]
-            self.tracks_info.update({self.selected: Track(
-                artist=s.artist, title=s.title, album=s.album,
-                genre=s.genre, url=s.url, id=s.id,
-                arturl=s.arturl, color=(.7, .7, .7, .8),
-                duration=s.duration, is_selected=False)})
+#             self.tracks_info.update({self.selected: Track(
+#                 artist=s.artist, title=s.title, album=s.album,
+#                 genre=s.genre, url=s.url, id=s.id,
+#                 arturl=s.arturl, color=(.7, .7, .7, .8),
+#                 duration=s.duration, is_selected=False)})
             self.info = s.title
+            if s.arturl != 'data/icons/wait.zip':
+                #                 print('224: %s' % s.arturl)
+                self.bgimg = s.arturl
             idx = self.idlist.index(value)
             if idx > 3 and len(self.idlist) > 8:
-                self.ids.trackslist.scroll_to(idx-3)
+                # self.ids.trackslist.adapter.get_view(idx)
+                # print(float(idx) / float(len(self.idlist)))
+                # self.ids.trackslist.children[0].scroll_y = 1.000 -\
+                #   float(idx + 3) / float(len(self.idlist))
+                self.ids.trackslist.scroll_to(idx - 3)
                 Logger.debug('scroll to %s' % str(idx - 3))
             else:
+                #                 self.ids.trackslist.children[0].scroll_y = 1
                 self.ids.trackslist.scroll_to(0)
                 Logger.debug('scroll to 0')
 
@@ -237,7 +234,7 @@ class MediaPlayer(Screen):
         self.list_tracks.data = value
 
     def on_server_list(self, instance, value):
-#         print('server')
+        #         print('server')
         for item in value:
             if item in self.server_tabs or item == 'Local':
                 continue
@@ -287,9 +284,9 @@ class MediaPlayer(Screen):
         self.main_ui.ids['active_renderer'].values = ['local'] + value
 
     def on_idarray(self, value):
-#         print('IdArray: %s' % value)
+        #         print('IdArray: %s' % value)
         if value != self._idarray:
-#             print('call update tracklist')
+            #             print('call update tracklist')
             self.update_tracklist(value)
 
     def on_id(self, value):
@@ -338,9 +335,10 @@ class MediaPlayer(Screen):
             print('State: %s' % value)
             self.transportstate = value
             if value == 'Stopped':
-    #             self.ids.playerstatus.animate_stop()
+                #             self.ids.playerstatus.animate_stop()
                 self.playing = False
-                if 'state' in self.controller.parent.devices[self.active_device]:
+                if 'state' in self.controller.parent.devices[
+                        self.active_device]:
                     self.controller.parent.devices[
                         self.active_device]['state'] = False
                 else:
@@ -351,9 +349,10 @@ class MediaPlayer(Screen):
                 if self._timer:
                     self._timer.set(0)
             elif value == 'Playing':
-    #             self.ids.playerstatus.animate_play()
+                #             self.ids.playerstatus.animate_play()
                 self.playing = True
-                if 'state' in self.controller.parent.devices[self.active_device]:
+                if 'state' in self.controller.parent.devices[
+                        self.active_device]:
                     self.controller.parent.devices[
                         self.active_device]['state'] = True
                 else:
@@ -363,9 +362,10 @@ class MediaPlayer(Screen):
                     self._timer.start()
     #             self.action = 'II'
             elif value == 'Paused':
-    #             self.ids.playerstatus.animate_pause()
+                #             self.ids.playerstatus.animate_pause()
                 self.playing = False
-                if 'state' in self.controller.parent.devices[self.active_device]:
+                if 'state' in self.controller.parent.devices[
+                        self.active_device]:
                     self.controller.parent.devices[
                         self.active_device]['state'] = False
                 else:
@@ -376,7 +376,7 @@ class MediaPlayer(Screen):
                     self._timer.stop()
 
     def on_metadata(self, value):
-#         print('Metadata: %s' % value)
+        print('Metadata: %s' % value)
         if value:
             if self.selected in self.tracks_info:
                 info = update_trackinfo(didl_decode(value)[0])
@@ -389,6 +389,7 @@ class MediaPlayer(Screen):
                               else '0:00:00'),
                     is_selected=False)})
                 self.info = info['title']
+                print('396: %s' % info['arturl'])
                 self.bgimg = info['arturl']
                 if self.pop:
                     self.popup.dismiss()
@@ -399,27 +400,27 @@ class MediaPlayer(Screen):
                                   value)
 
     def on_volume_(self, value):
-#         print('volume: %s' % value)
+        #         print('volume: %s' % value)
         if int(value) != self.volume:
             self.volume = int(value)
 
     def on_volume_steps_(self, value):
-#         print('volume steps: %s' % value)
+        #         print('volume steps: %s' % value)
         if int(value) != self.volume_steps:
             self.volume_steps = int(value)
 
     def on_repeat_(self, value):
-#         print('repeat: %s' % value)
+        #         print('repeat: %s' % value)
         if self.repeat != bool(value):
             self.repeat = bool(value)
 
     def on_shuffle_(self, value):
-#         print('shuffle: %s' % value)
+        #         print('shuffle: %s' % value)
         if self.shuffle != bool(value):
             self.shuffle = bool(value)
 
     def on_track_duration(self, value):
-#         print('duration: %s' % value)
+        #         print('duration: %s' % value)
         if int(value) != self.duration:
             self.duration = int(value)
             if self._timer:
@@ -436,15 +437,17 @@ class MediaPlayer(Screen):
 
     def register_renderer(self, uid):
         if uid != self.active_device:
-#             if uid != 'local':
-# #                 self.bgimg = 'data/icons/wait2.gif'
-            self.lists.update({self.active_device: (self._idarray, self.idlist, self.tracks_info)})
+            #             if uid != 'local':
+            # #                 self.bgimg = 'data/icons/wait2.gif'
+            self.lists.update({self.active_device: (
+                self._idarray, self.idlist, self.tracks_info)})
             self.tracks_info = {}
             self._idarray = ''
             self.idlist = []
             self.bgimg = 'data/icons/background_icon2.png'
             self.selected = -1
-            self.ids.trackslist.scroll_to(0)
+#             self.ids.trackslist.children[0].scroll_y = 1
+#             self.ids.trackslist.scroll_to(0)
             self.active_device = uid
             if uid == 'local':
                 if self.pop:
@@ -452,76 +455,84 @@ class MediaPlayer(Screen):
 #                 print('Local Renderer')
             else:
                 if uid in self.lists:
-                    self._idarray, self.idlist, self.tracks_info = self.lists[uid]
+                    self._idarray, self.idlist, self.tracks_info = self.lists[
+                        uid]
                     self.popup.dismiss()
                     self.pop = False
 #                 if self.realparent.current_device['type'] == 'oh':
-                Logger.debug(str(self.controller.parent.devices[uid]['services']))
-                for svc in  self.controller.parent.devices[uid]['services'].values():
-                    d = None
-                    if 'Playlist' in svc['serviceType']:
-                        d = self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'IdArray',
-                            self.on_idarray)
-                        self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'Id',
-                            self.on_id)
-                        self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'TransportState',
-                            self.on_oh_tstate)
-                        self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'Shuffle',
-                            self.on_shuffle_)
-                        self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Playlist:1',
-                            'Repeat',
-                            self.on_repeat_)
-                    elif 'Time' in svc['serviceType']:
-                        d = self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Time:1',
-                            'Duration',
-                            self.on_track_duration)
-
-                        if not self.controller.cloud:
-                            self.controller.subscribe(
-                                {uid: self.controller.parent.devices[uid]},
-                                'urn:av-openhome-org:service:Time:1',
-                                'Seconds',
-                                self.on_seconds)
-                        
-                    elif 'Info' in svc['serviceType']:
-                        d = self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Info:1',
-                            'Metadata',
-                            self.on_metadata)
-                    elif 'Volume' in svc['serviceType']:
-                        d = self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Volume:1',
-                            'Volume',
-                            self.on_volume_)
-                        self.controller.subscribe(
-                            {uid: self.controller.parent.devices[uid]},
-                            'urn:av-openhome-org:service:Volume:1',
-                            'VolumeSteps',
-                            self.on_volume_steps_)
-                    if d:
-                        d.addCallbacks(
-                            self.register_subscription, lambda ignored: self.popup.dismiss())
+                Logger.debug(
+                    str(self.controller.parent.devices[uid]['services']))
+                self.get_subscriptions(uid)
 #                 self.controller.subscribe(
 #                     name, self.renderer_event,
 #                     'renderer')
+
+    def get_subscriptions(self, uid):
+        for svc in self.controller.parent.devices[
+                uid]['services'].values():
+            d = None
+            if 'Playlist' in svc['serviceType']:
+                d = self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Playlist:1',
+                    'IdArray',
+                    self.on_idarray)
+                self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Playlist:1',
+                    'Id',
+                    self.on_id)
+                self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Playlist:1',
+                    'TransportState',
+                    self.on_oh_tstate)
+                self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Playlist:1',
+                    'Shuffle',
+                    self.on_shuffle_)
+                self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Playlist:1',
+                    'Repeat',
+                    self.on_repeat_)
+            elif 'Time' in svc['serviceType']:
+                d = self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Time:1',
+                    'Duration',
+                    self.on_track_duration)
+
+                if not self.controller.cloud:
+                    self.controller.subscribe(
+                        {uid: self.controller.parent.devices[uid]},
+                        'urn:av-openhome-org:service:Time:1',
+                        'Seconds',
+                        self.on_seconds)
+
+            elif 'Info' in svc['serviceType']:
+                d = self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Info:1',
+                    'Metadata',
+                    self.on_metadata)
+            elif 'Volume' in svc['serviceType']:
+                d = self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Volume:1',
+                    'Volume',
+                    self.on_volume_)
+                self.controller.subscribe(
+                    {uid: self.controller.parent.devices[uid]},
+                    'urn:av-openhome-org:service:Volume:1',
+                    'VolumeSteps',
+                    self.on_volume_steps_)
+            if d:
+                d.addCallbacks(
+                    self.register_subscription,
+                    lambda ignored: self.popup.dismiss())
+
     def register_subscription(self, res):
         if res is None:
             return
@@ -555,12 +566,12 @@ class MediaPlayer(Screen):
                             self.trees[tree].toggle_node(self.trees[tree].root)
 
     def get_tracks_info(self, tracks):
-#         print('tracksinfo')
+        #         print('tracksinfo')
         def got_info(res, tracks):
-#             print('res from server')
+            #             print('res from server')
 
             if isinstance(tracks, int):
-#                 print(res.Metadata)
+                #                 print(res.Metadata)
                 info = didl_decode(res.Metadata)
                 if len(info) > 1:
                     print('bad response')
@@ -580,11 +591,12 @@ class MediaPlayer(Screen):
                     is_selected=False)})
                 if tracks == self.selected:
                     self.info = info['title']
+                    print('593: %s' % info['arturl'])
                     self.bgimg = info['arturl']
             else:
-#                 print(res)
-#                 print(res.decode('utf-8'))
-#                 root = et.XML(res.decode('utf-8'))
+                #                 print(res)
+                #                 print(res.decode('utf-8'))
+                #                 root = et.XML(res.decode('utf-8'))
                 try:
                     root = et.fromstring(res)
                 except Exception as e:
@@ -626,7 +638,6 @@ class MediaPlayer(Screen):
                 if self.pop:
                     self.popup.dismiss()
                     self.pop = False
-
         if len(tracks) == 1:
             d = self.controller.call(
                 self.device, PLAYLIST,
@@ -641,24 +652,27 @@ class MediaPlayer(Screen):
 
     def generate_empty_dict(self, l):
         t = Track(artist='', title='updating...', album='', genre='',
-                  url='', id=0, arturl='data/image-loading.gif',
+                  url='', id=0, arturl='data/icons/wait.zip',
                   color=(.5, .5, .5, .5), duration='0:00:00',
                   is_selected=False)
         self.tracks_info.update({i: t for i in l})
 
     def update_tracklist(self, idarray):
         def updated(res, l):
-#             print('track_list updated')
+            #             print('track_list updated')
             self.pending.remove('tracksinfo')
             if self.selected > -1:
                 i = l.index(self.selected)
                 if i > 3:
-                    self.ids.trackslist.scroll_to(i-3)
+                    self.ids.trackslist.scroll_to(i - 3)
+#                     self.ids.trackslist.children[0].scroll_y = 1.000 -\
+#                         float(i + 3) / float(len(l))
                 else:
+                    #   self.ids.trackslist.children[0].scroll_y = 1
                     self.ids.trackslist.scroll_to(0)
         #  print('update: %s' % idarray)
         if 'tracksinfo' in self.pending:
-#             print('cancelled')
+            #             print('cancelled')
             return
         #  print('ok')
         self.pending.append('tracksinfo')
@@ -676,12 +690,14 @@ class MediaPlayer(Screen):
                     del self.tracks_info[t]
                 except KeyError:
                     continue
-            if len(querylist) > 11:
+                self.pending.remove('tracksinfo')
+                return
+            if len(querylist) > 25:
                 dlist = []
                 newlist = []
                 for trackid in querylist:
                     newlist.append(trackid)
-                    if len(newlist) % 12 == 0:
+                    if len(newlist) % 26 == 0:
                         dlist.append(self.get_tracks_info(newlist))
                         newlist = []
                 if len(newlist) > 0:
@@ -695,7 +711,7 @@ class MediaPlayer(Screen):
 
     def append_track(self, url, md):
         def appended(res):
-#             print('appended: %s, id: %s' % (url, res))
+            #             print('appended: %s, id: %s' % (url, res))
             return res
         d = self.controller.call(
             self.device, PLAYLIST,
@@ -705,7 +721,7 @@ class MediaPlayer(Screen):
 #         self.track_list.append(url)
 
     def replace_tracks(self, url, md):
-#         print('replace: %s' % url)
+        #         print('replace: %s' % url)
         d = self.controller.call(
             self.device, PLAYLIST,
             'DeleteAll')
@@ -715,7 +731,7 @@ class MediaPlayer(Screen):
         return d
 
     def play_id(self, trackid):
-#         print('play %s' % trackid)
+        #         print('play %s' % trackid)
         d = self.controller.call(
             self.device,
             PLAYLIST,
@@ -801,7 +817,6 @@ class MediaPlayer(Screen):
             self.device, VOLUME,
             'SetVolume', str(self.desired_vol))
         return d
-        
 
     def call(self, fct, trackid):
         if fct == 'play':
@@ -931,11 +946,12 @@ class ButtonVolume(Image):
 #         print('vol max: %s' % value)
 
     def on_volume(self, instance, volume):
-#         print(self.max_vol)
-        if volume < self.max_vol/3:
+        #         print(self.max_vol)
+        if volume < self.max_vol / 3:
             self.source = 'atlas://data/images/defaulttheme/audio-volume-low'
         elif volume < self.max_vol * 0.66:
-            self.source = 'atlas://data/images/defaulttheme/audio-volume-medium'
+            self.source = \
+                'atlas://data/images/defaulttheme/audio-volume-medium'
         else:
             self.source = 'atlas://data/images/defaulttheme/audio-volume-high'
 
@@ -949,6 +965,7 @@ class TreeViewMedia(BoxLayout, TreeViewNode):
 class TrackListDropDown(DropDown):
     pass
 
+
 class TrackListPopUp(BoxLayout):
     button = ObjectProperty()
 
@@ -957,7 +974,7 @@ class TrackListBubble(Bubble):
 
     def __init__(self, pos, size, **kwargs):
         super(TrackListBubble, self).__init__(**kwargs)
-        width = dp(size/5)
+        width = dp(size / 5)
         self.pos = (pos[0] + size - width, pos[1] + dp(40))
         self.size = (width, dp(80))
 
@@ -972,7 +989,7 @@ class MyLib(ListItemButton):
     deselected_color = ListProperty([.5, .5, .5, .3])
 #     size_hint: (None, .15)
     fake = BooleanProperty(False)
-    img = StringProperty('data/image-loading.gif')
+    img = StringProperty('data/icons/wait.zip')
     title = StringProperty('')
     artist = StringProperty('')
     trackid = NumericProperty(0)
@@ -980,7 +997,7 @@ class MyLib(ListItemButton):
     scheduled = None
 
     def __init__(self, *args, **kwargs):
-#         kwargs.update({'always_release': False})
+        #         kwargs.update({'always_release': False})
         super(MyLib, self).__init__(*args, **kwargs)
         self.bind(on_release=self.release)
 
@@ -989,7 +1006,7 @@ class MyLib(ListItemButton):
         return True
 
     def release(self, *args, **kwargs):
-#         print('release')
+        #         print('release')
         if self.scheduled:
             self.scheduled.cancel()
             self.scheduled = None
@@ -1027,7 +1044,7 @@ class MyLib(ListItemButton):
 #         else:
 #             self.menu.open(self)
         self.menu_open = True
-    
+
     def define_size(self, size):
         print(size)
         if size[0] < 120:
@@ -1035,10 +1052,9 @@ class MyLib(ListItemButton):
             self.menu.size_hint = self.menu.size_hint[0] * 1.5,\
                 self.menu.size_hint[1] * 1.5
 
-
     def close_menu(self, ignored):
-#         print('close %s' % ignored)
-#         print(self.menu_open)
+        #         print('close %s' % ignored)
+        #         print(self.menu_open)
         if self.menu_open:
             self.menu_open = False
             self.menu.dismiss()
@@ -1055,8 +1071,10 @@ class ArtistImageTree(AsyncImage):
 class ServerItem(TabbedPanelItem):
     pass
 
+
 class VolPopUp(Popup):
     media = ObjectProperty()
+
 
 class AnimatedTextButton(Button):
     _label = ObjectProperty(None)
@@ -1076,21 +1094,22 @@ class AnimatedTextButton(Button):
     def animate_pause(self):
         if self.current:
             self.current.stop(self._label)
-        left = Animation(x=self.width/2 - self._label.width/2)
+        left = Animation(x=self.width / 2 - self._label.width / 2)
         left.bind(on_complete=self.blink)
-        right = Animation(x=self.width/2 - self._label.width/2, duration=.1)
+        right = Animation(
+            x=self.width / 2 - self._label.width / 2, duration=.1)
         anim = left + right
         anim.repeat = True
         anim.start(self._label)
         self.current = anim
-        
+
     def animate_stop(self):
         if self.current:
             self.current.repeat = False
             self.current.stop(self._label)
             self.current = None
             self._label.text = self.sometext
-            self._label.x = self.width/2 - self._label.width/2
+            self._label.x = self.width / 2 - self._label.width / 2
 
     def blink(self, *args, **kwargs):
         if self._label.text == '':
@@ -1115,12 +1134,12 @@ class Timer(object):
             self.callback(self.seconds)
 
     def start(self):
-#         print('start')
+        #         print('start')
         self.running = True
         reactor.callLater(1, self.event)  # @UndefinedVariable
 
     def stop(self):
-#         print('stop')
+        #         print('stop')
         self.running = False
 
     def event(self):
@@ -1130,28 +1149,31 @@ class Timer(object):
             self.callback(self.seconds)
             reactor.callLater(1, self.event)  # @UndefinedVariable
 
+
 def update_trackinfo(d):
-#     print(d)
-    if 'class' in d:
-            if 'audio' in d['class']:
-                cat = 'audio'
-                img = 'data/icons/audio.png'
-            elif 'video' in d['class']:
-                cat = 'video'
-                img = 'data/icons/movie.png'
-            else:
-                cat = 'none'
-                img = 'data/icons/icon.png'
-    else:
-        img = 'data/icons/icon.png'
+    #     print(d)
+    cat = 'none'
+    img = None
     if 'albumArtURI' in d:
         if isinstance(d['albumArtURI'], str):
             img = d['albumArtURI']
         elif 'text' in d['albumArtURI']:
-                img = d['albumArtURI']['text']
+            img = d['albumArtURI']['text']
     elif 'res1' in d:
         if 'image' in d['res1']['protocolInfo']:
             img = d['res1']['text']
+    elif 'class' in d:
+        if 'audio' in d['class']:
+            cat = 'audio'
+            img = 'data/icons/audio.png'
+        elif 'video' in d['class']:
+            cat = 'video'
+            img = 'data/icons/movie.png'
+        else:
+            cat = 'none'
+            img = 'data/icons/icon.png'
+    if not img:
+        img = 'data/icons/icon.png'
     d.update({
         'arturl': img,
         'artist': (d['artist'] if 'artist' in d and cat == 'audio' else ''),
@@ -1164,7 +1186,6 @@ def get_titles(res):
     t = []
     if res.Result:
         for r in didl_decode(res.Result.encode('utf-8')):
-            browsable = False
             if 'object.container' in r['class']:
                 if 'childCount' in r:
                     if int(r['childCount']) < 1:
@@ -1203,28 +1224,28 @@ def get_titles(res):
 
 
 def populate_tree(nodes, rootnode, parent=None):
-        if parent is not None:
-            for node in nodes:
-                new = rootnode.add_node(node, parent)
-                new.id = node.id
-                new.browsable = node.browsable
-                new.populated = node.populated
-                if new.browsable:
-                    rootnode.add_node(TreeViewLabel(text='fake'), new)
-        else:
-            for node in nodes:
-                new = rootnode.add_node(node)
-                new.id = node.id
-                new.browsable = node.browsable
-                new.populated = node.populated
-                if new.browsable:
-                    rootnode.add_node(TreeViewLabel(text='fake'), new)
+    if parent is not None:
+        for node in nodes:
+            new = rootnode.add_node(node, parent)
+            new.id = node.id
+            new.browsable = node.browsable
+            new.populated = node.populated
+            if new.browsable:
+                rootnode.add_node(TreeViewLabel(text='fake'), new)
+    else:
+        for node in nodes:
+            new = rootnode.add_node(node)
+            new.id = node.id
+            new.browsable = node.browsable
+            new.populated = node.populated
+            if new.browsable:
+                rootnode.add_node(TreeViewLabel(text='fake'), new)
 
 
 def populate_local_tree(node, path):
     filedict = {}
     tree = collections.OrderedDict()
-    for root, dirs, files in os.walk(path.encode('utf-8')):
+    for root, dirs, files in os.walk(path.encode('utf-8')):  # @UnusedVariable
         if root.startswith('.') or '/.' in root:
             continue
         show = False
@@ -1245,14 +1266,14 @@ def populate_local_tree(node, path):
             path = path.strip('/')
 #             print('folder: %s' % root)
             if root == path:
-#                 print('top')
+                #                 print('top')
                 top = True
             r = root.split('/')
             for i, name in enumerate(r):
-                p = '/'.join(r[:i+1])
+                p = '/'.join(r[:i + 1])
                 try:
-                    parent = tree[i-1][root.split('/')[i-1]][p[:-(len(
-                        name)+1)]]
+                    parent = tree[i - 1][root.split('/')[i - 1]][p[:-(len(
+                        name) + 1)]]
                 except KeyError:
                     parent = None
                 if i in tree:
@@ -1328,5 +1349,3 @@ def populate_local_tree(node, path):
         nf = node.add_node(
             TreeViewLabel(text=f.split('/')[-1]), tree['root'])
         nf.filepath = f
-
-        

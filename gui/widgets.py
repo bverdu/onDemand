@@ -2,42 +2,57 @@
 '''
 Created on 29 mai 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 from __future__ import print_function
+
 import os
-from kivy.core.window import Window
+
 from kivy.clock import Clock
-from kivy.graphics.transformation import Matrix
+from kivy.core.window import Window
+#  from kivy.graphics.transformation import Matrix
+from kivy.loader import Loader
 from kivy.metrics import dp
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.popup import Popup
-from kivy.uix.screenmanager import Screen
-from kivy.uix.scatter import Scatter
-from kivy.uix.button import Button
-from kivy.uix.label import Label
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.bubble import Bubble
-from kivy.uix.togglebutton import ToggleButton
-from kivy.uix.settings import SettingString, SettingSpacer, SettingPath
-from kivy.uix.filechooser import FileChooserListView
-from kivy.uix.image import Image
 from kivy.properties import ObjectProperty,\
     StringProperty, DictProperty, BooleanProperty, ListProperty
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.bubble import Bubble
+from kivy.uix.button import Button
+from kivy.uix.filechooser import FileChooserListView
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.image import Image, AsyncImage
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
+from kivy.uix.scatter import Scatter
+from kivy.uix.screenmanager import Screen
+from kivy.uix.settings import SettingString, SettingSpacer, SettingPath
+from kivy.uix.togglebutton import ToggleButton
+
+Loader.num_workers = 4
+Loader.loading_image = 'data/icons/wait.zip'
 
 
 def button_size():
     if Window.size[0] > Window.size[1]:
-        return Window.size[0]/5, Window.size[1]/8
+        return Window.size[0] / 5, Window.size[1] / 8
     else:
-        return Window.size[0]/3, Window.size[1]/8
+        return Window.size[0] / 3, Window.size[1] / 8
 
 
 class Home(Screen):
     background = StringProperty('data/background_ebony.png')
     status = DictProperty()
     room = ''
+
+    def unlock_widgets(self, state):
+        print('unlock: %s' % state)
+
+        if isinstance(self.children[0], FloatLayout):
+            for w in self.children[0].children:
+                w.do_translation_x = state
+                w.do_translation_y = state
 
 
 class StartPage(GridLayout):
@@ -60,8 +75,8 @@ class StartPage(GridLayout):
                         self.add_device(dev)
 
     def on_roomlist(self, instance, value):
-#         print('room: %s' % value)
-#         print(len(self.children))
+        #         print('room: %s' % value)
+        #         print(len(self.children))
         if len(self.children) == 0:
             def later(ignored):
                 self.on_roomlist(instance, value)
@@ -95,8 +110,7 @@ class StartPage(GridLayout):
                         self.add_device(device)
 
     def add_room(self, room, pic):
-#         print('dimensions: %s X %s' % (self.parent.width, self.parent.height))
-        print('from Window: %s X %s' % Window.size)
+        #  print('from Window: %s X %s' % Window.size)
         w = button_size()[0]
         r = RoomButton(ltext=room,
                        pic=pic,
@@ -110,14 +124,15 @@ class StartPage(GridLayout):
 
     def add_device(self, device):
         w = button_size()[0]
-        print('dimensions d : %s X %s' % (self.parent.width, self.parent.height))
+        print('dimensions d : %s X %s' %
+              (self.parent.width, self.parent.height))
         if device['type'] == 'Lights':
             if self.lights:
                 b = LightButtonWithText(
-                        pic=type_img(device['type']),
-                        ltext=device['name'],
-                        width=w,
-                        size_hint=(None, 1))
+                    pic=type_img(device['type']),
+                    ltext=device['name'],
+                    width=w,
+                    size_hint=(None, 1))
 #                         size_hint=((.20, 1)
 #                                    if Window.size[0] >= Window.size[1]
 #                                    else (.4, 1)))
@@ -125,11 +140,11 @@ class StartPage(GridLayout):
         elif device['type'] == 'MediaPlayer':
             if self.medias:
                 b = MediaButtonWithText(
-                        pic=type_img(device['type']),
-                        ltext=device['name'],
-                        device=device,
-                        width=w,
-                        size_hint=(None, 1))
+                    pic=type_img(device['type']),
+                    ltext=device['name'],
+                    device=device,
+                    width=w,
+                    size_hint=(None, 1))
                 self.medias.add_widget(b)
         else:
             return
@@ -219,10 +234,10 @@ class SensorPad(Scatter):
             else:
                 l = Label(text='%s: %s %s' % (d, v, u))
             self.ids.bl.add_widget(l)
-        self.size = (self.size[0], 40*len(value))
+        self.size = (self.size[0], 30 * len(value))
 #         m = Matrix().scale(1, len(value), 1)
 #         self.apply_transform(m, True)
-            
+
 
 class DeviceButton(Scatter):
     pic_true = StringProperty('data/icons/lamp_1.png')
@@ -238,7 +253,7 @@ class DeviceButton(Scatter):
 
     def pushed(self):
         if self.do_translation_x:
-            #print('unlocked')
+            # print('unlocked')
             return True
         else:
             Clock.schedule_once(self.show_bubble, 1)
@@ -248,24 +263,24 @@ class DeviceButton(Scatter):
         if self.scheduled:
             Clock.unschedule(self.show_bubble)
             self.scheduled = False
-            #print('locked')
+            # print('locked')
             self.state = not self.state
             self.play(self)
         if self.do_translation_x:
-            #print('locking')
+            # print('locking')
             self.do_translation_x = False
             self.do_translation_y = False
             if self.config:
                 self.config.set(
                     self.name,
                     'position',
-                    str(self.pos[0])+'*'+str(self.pos[1]))
+                    str(self.pos[0]) + '*' + str(self.pos[1]))
                 self.config.write()
-                
-    def unlock(self):
-        #print('unlock')
-        self.do_translation_x = True
-        self.do_translation_y = True
+
+    def unlock(self, state=True):
+        # print('unlock')
+        self.do_translation_x = state
+        self.do_translation_y = state
 #         self.unlocked = True
 #         self.remove_widget(self.bubb)
 #         return False
@@ -273,7 +288,7 @@ class DeviceButton(Scatter):
     def show_bubble(self, *l):
         self.scheduled = False
 #         self.bubb = bubb = self.bubble()
-        #bubb.pos = bubb.pos[0] + self.width, bubb.pos[1]
+        #  bubb.pos = bubb.pos[0] + self.width, bubb.pos[1]
         if not self.bubble:
             self.bubble = Pop_device(self)
         self.bubble.display()
@@ -281,7 +296,7 @@ class DeviceButton(Scatter):
 
 #     def on_touch_down(self, touch):
 # #         print('touch %s - %s' % (touch.pos, self.pos))
-#         
+#
 #         '''.. versionchanged:: 1.4.0'''
 #         if self.collide_point(*touch.pos):
 #             self.state = not self.state
@@ -289,6 +304,7 @@ class DeviceButton(Scatter):
 #             return self.play(self)
 #             if self.locked:
 #                 return True
+
 
 class LightButton(DeviceButton):
     pass
@@ -309,7 +325,7 @@ class HVAC(Screen):
     pass
 
 
-class BgImage(Image):
+class BgImage(AsyncImage):
     pass
 
 
@@ -438,7 +454,7 @@ class SettingPos(SettingString):
             x = x - self.img.pos[0] - 20.0
             y = y + 68.0
 #             print('%s * %s' % (x, y))
-            self.position = str(x)+'*'+str(y)
+            self.position = str(x) + '*' + str(y)
 
     def _validate(self, instance):
         value = self.position
@@ -471,8 +487,8 @@ class SettingPos(SettingString):
 
         # all done, open the popup !
         popup.open()
-        
-        
+
+
 def type_img(typ):
     if typ in ['Lights']:
         return 'data/icons/lamp_1.png'

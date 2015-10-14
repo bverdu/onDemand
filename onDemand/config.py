@@ -1,16 +1,18 @@
 '''
 Created on 12 nov. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 # User variables
 
 rooms = {}
 hmodules = {}
+cloudmodules = {}
 triggers = {}
 protocol = 'oh'
 media_types = []
+auto = {}
 # multimediatype = 'UPnP'
 lirc_receiver = '/var/run/lirc/lircd'
 lirc_emitter = 'fake'
@@ -25,7 +27,8 @@ clients = ['mprisclient', 'omxclient', 'mpdclient', 'control', 'mediaserver']
 shared_dirs = ['/home/babe/Projets/eclipse/onDemand/']
 network = 'lan'
 cloud_user = 'test@xmpp.example.com'
-cloud_secret = 'test'
+cloud_secret = 'password'
+datadir = '/usr/share/onDemand/'
 
 
 # imports = '''

@@ -43,9 +43,9 @@
                 on_press:
                     app.open_settings()
                     
- ###########################################################################
- ############################ Screens #########################################
- ###########################################################################
+###########################################################################
+############################ Screens ######################################
+###########################################################################
  
 ################### Home screen ##################### 
 
@@ -76,14 +76,15 @@
     shuffle: self.shuffle
     duration: self.duration
     info: self.info
+    on_bgimg:
+        print(args[1])
     AnchorLayout:
         BgImage:
-            size_hint: 0, 0
             source: root.bgimg
     BoxLayout:
         orientation: 'vertical'
         Carousel:
-            index: 1
+            index: 2
             id: mpcarousel
             direction: 'right'
             TabbedPanel:
@@ -150,9 +151,15 @@
                 Label:
                     text: ''
                 BoxLayout:
-                    size_hint: (1, 0.3)
+                    size_hint: (1, .2)
                     orientation: 'vertical'
                     BoxLayout:
+                        canvas:
+                            Color:
+                                rgba: 0,0,0,.4
+                            Rectangle:
+                                size: self.size
+                                pos: self.pos
                         orientation: 'horizontal'
                         Label:
                             size_hint: (.1, 1)
@@ -192,7 +199,13 @@
                             size_hint: (.1, 1)
                             text: ''
                 FloatLayout:
-                    size_hint: (1, .2)
+                    size_hint: (1, .1)
+                    canvas:
+                        Color:
+                            rgba: 0,0,0,.4
+                        Rectangle:
+                            size: self.size
+                            pos: self.pos
                     ProgressBar:
                         pos_hint: {'x': 0}
                         orientation: 'horizontal'
@@ -224,6 +237,7 @@
                     mpcarousel.index = (1 if mpcarousel.index == 2 else 2)
                     
 ################# Start Layout #################
+
 <StartPage>:
     format: self.format
     cols: 1
@@ -250,8 +264,6 @@
                 background_color: .5, .5, .5, .5
                 border: 0, 0, 0, 0
                 text: ''
-                on_press:
-                    print('rotation: %s -- Size: %s' % (Window.rotation, Window.size))
                 BoxLayout:
                     orientation: 'vertical'
                     pos: self.parent.pos
@@ -265,7 +277,7 @@
                         size_hint: 1, .2
                         text: "We are out"
             Button:
-                #height: root.format[1]
+                # height: root.format[1]
                 width: root.format[0]
                 size_hint: None, 1
                 background_color: .5, .5, .5, .5
@@ -286,7 +298,7 @@
                         size_hint: 1, .2
                         text: "All lights off"
             Button:
-                #height: root.format[1]
+                # height: root.format[1]
                 width: root.format[0]
                 size_hint: None, 1
                 background_color: .5, .5, .5, .5
@@ -479,9 +491,37 @@
         Rectangle:
             size: self.size
     BoxLayout:
-        id: bl
         orientation: 'vertical'
         size: self.parent.size
+        ToggleButton:
+            id: tgb_lock
+            state: self.state
+            pic_unlock: 'data/icons/unlock.png'
+            pic_lock: 'data/icons/lock.png'
+            # size_hint_y: .2
+            height: '15sp'
+            background_color: .1, .1, .1, 0
+            background_normal: ''
+            background_down: ''
+            pic: self.pic_unlock if (self.state == 'down') else self.pic_lock
+            txt: 'Lock controls' if (self.state == 'down') else 'Unlock controls'
+            on_press:
+                app.root.home.unlock_widgets(self.state == 'down')
+            BoxLayout:
+                orientation: 'horizontal'
+                size: self.parent.size
+                pos: self.parent.pos
+#                on_touch_down:
+#                    tgb_lock.pushed()
+                Image:
+                    size_hint: 0.3, 1
+                    source: tgb_lock.pic
+                Label:
+                    text: tgb_lock.txt 
+        BoxLayout:
+            id: bl
+            orientation: 'vertical'
+            
 
      
 <DeviceButton>:
@@ -527,7 +567,7 @@
     border: 0, 0, 0, 0
     text: ''
     on_press:
-        app.root.set_room(root.ltext)
+        app.root.set_device(root.device)
     BoxLayout:
         orientation: 'vertical'
         pos: self.parent.pos
@@ -743,13 +783,14 @@
 <ListView>:
     container: container
     ScrollView:
+        id: sv
         pos: root.pos
-        on_scroll_y: root._scroll(args[1])
         do_scroll_x: False
-        bar_width: 10
+        #bar_width: 10
         scroll_wheel_distance: 120
         #scroll_timeout: 10
         #scroll_y: .9
+        on_scroll_y: root._scroll(args[1])
         GridLayout:
             cols: 1
             id: container
@@ -775,14 +816,16 @@
             pos: (self.x +5 , self.y + self.parent.size[1] * .1) if self.parent else (self.x +5, self.y + 2)
             
 <-BgImage>
+    keep_ratio: True
+    allow_stretch: True
     canvas:
         Color:
             rgb: (1, 1, 1)
         Rectangle:
             texture: self.texture
-            size: (self.parent.width - self.parent.width/4, self.parent.height - self.parent.height/4)
-            pos: (self.parent.x +self.parent.width/8, self.parent.y + self.parent.height/8)
-
+            size: (self.parent.width * .8, self.parent.width * .8) if (self.parent.height > self.parent.width) else (self.parent.height * .8, self.parent.height * .8)
+            # size: (parent.width - self.parent.width/4, self.parent.height - self.parent.height/4)
+            pos: (self.parent.x +self.parent.width/4.5, self.parent.y + self.parent.height/8) if (self.parent.width > self.parent.height) else (self.parent.x +self.parent.width/8.5, self.parent.y + self.parent.height/3)
       
 <WaitingPopup>:
     img: self.img
@@ -940,6 +983,4 @@
 <Shutters>:
     Label:
         text: 'Shutters'
-    
-
-            
+        

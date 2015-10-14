@@ -2,7 +2,7 @@
 '''
 Created on 20 mars 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 
@@ -111,7 +111,7 @@ class Playlist(ServiceBase):
     def IdArray(ctx):  # @NoSelf
         pass
 
-    @rpc(Unicode, _return=Unicode, _out_variable_name='Value')
+    @rpc(Unicode, _returns=Unicode, _out_variable_name='Value')
     def IdArrayChanged(ctx, Token):  # @NoSelf
         pass
 

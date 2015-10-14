@@ -2,7 +2,7 @@
 '''
 Created on 29 déc. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import os
 from twisted.application import internet
@@ -81,7 +81,7 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
         if 'state' in changed:
             self.set_state(state['state'])
         if "volume" in changed:
-            log.msg('volume changed', loglevel='debug')
+            log.msg('volume changed', loglevel=logging.DEBUG)
             vol = int(state['volume'])
             if vol != self._volume:
                 if vol != 0:
@@ -89,7 +89,7 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
                     muted = False
                 else:
                     muted = True
-                log.msg('send volume', loglevel='debug')
+                log.msg('send volume', loglevel=logging.DEBUG)
                 self.oh_eventVOLUME(self._volume, 'volume')
                 self.upnp_eventRCS(self._volume, 'Volume')
                 if muted is not self._muted:
@@ -383,7 +383,7 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
 
         def convert_volume(vol):
             self._volume = int(float(vol) * 100)
-            log.msg("volume= %d" % self._volume, loglevel='debug')
+            log.msg("volume= %d" % self._volume, loglevel=logging.DEBUG)
             return self._volume
 
         d = self.mediaplayer.get("Volume",
@@ -431,7 +431,7 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
         self.timer = None
 
     def set_state(self, state):
-        log.msg("SET NEW STATE : %s " % state, loglevel='debug')
+        log.msg("SET NEW STATE : %s " % state, loglevel=logging.DEBUG)
         if state == self._state:
             return
         self._state = state
@@ -471,7 +471,7 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
         else:
 #             log.err('Unknow State from player : %s' % state)
             return
-        log.msg('send new state: %s' % self._state, loglevel='debug')
+        log.msg('send new state: %s' % self._state, loglevel=logging.DEBUG)
         self.upnp_eventAV(self.upnp_state, 'TransportState')
         self.oh_eventPLAYLIST(self.oh_state, 'transportstate')
 
@@ -500,9 +500,9 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
         self.set_position(newpos, fmt)
 
     def set_track_URI(self, uri, md=''):
-        log.msg("set track uri : %s " % uri, loglevel='debug')
+        log.msg("set track uri : %s " % uri, loglevel=logging.DEBUG)
         try:
-            log.msg("current uri : %s " % self._track_URI, loglevel='debug')
+            log.msg("current uri : %s " % self._track_URI, loglevel=logging.DEBUG)
         except:
             pass
         if uri != self._track_URI:
@@ -543,7 +543,7 @@ class Mpdclient(internet.TCPClient):  # @UndefinedVariable
             d.addCallback(self.playing)
 
     def playing(self, *ret):
-            log.msg('playing...', loglevel='debug')
+            log.msg('playing...', loglevel=logging.DEBUG)
             self.set_state('play')
 
     def playindex(self, index):

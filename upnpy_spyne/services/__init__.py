@@ -1,14 +1,14 @@
 '''
 Created on 26 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 from collections import OrderedDict
 import uuid
 import re
 
 import logging
-logger = logging.getLogger(__name__)
+#  logger = logging.getLogger(__name__)
 
 from twisted.python import log
 
@@ -24,6 +24,7 @@ from spyne.decorator import rpc
 from spyne.model import Unicode, Integer32, UnsignedInteger32, Boolean, Null
 from spyne.model.complex import ComplexModel
 from spyne.server.twisted import TwistedWebResource
+from spyne.util import appreg
 
 
 class Service(object):
@@ -77,7 +78,7 @@ class Service(object):
             args_in = []
             args_out = []
             for arg in arguments:
-#                 print(arg)
+                #                 print(arg)
                 try:
                     typ = self.stateVariables[
                         arg.stateVariable.strip()].dataType
@@ -103,7 +104,7 @@ class Service(object):
             args = ()
             action_out_varname = ''
 #             f = func_template
-            n = '_'.join(('x', cc_to_us(name)))
+            n = '_'.join(('r', cc_to_us(name)))
 #             if n in dir(__builtins__):
 #                 n = ''.join((n, '_',))
 #             f.name = n
@@ -112,7 +113,6 @@ class Service(object):
 #             f = Make_func(n, self.__class__.upnp_type)
             if len(args_in) > 0:
                 if len(args_in) > 1:
-#                     args = [cc_to_us(arg[1]) for arg in args_in]
                     args = [arg[1] for arg in args_in]
                     action_in_type = [arg[0] for arg in args_in]
 #                     action_in_type = tuple(arg[0] for arg in args_in)
@@ -187,9 +187,9 @@ class Service(object):
             else:
                 if len(args_out) > 0:
                     if len(args_out) > 1:
-#                         print(
-#                             'name: %s -- varnames: %s -- types: %s'
-#                             % (name, action_out_varnames, action_out_type))
+                        #  print(
+                        #      'name: %s -- varnames: %s -- types: %s'
+                        #      % (name, action_out_varnames, action_out_type))
                         func = rpc(
                             _returns=action_out_type,
                             _out_variable_names=action_out_varnames,
@@ -222,7 +222,7 @@ class Service(object):
         self.event_resource = ServiceEventResource(self)
         self.resource = ServiceResource(self)
         if self.event_properties is None:
-                self.event_properties = {}
+            self.event_properties = {}
 
     def _get_type(self, typ):
         if typ in ('string', 'bin.base64', 'uri'):
@@ -257,7 +257,8 @@ class Service(object):
 #             sid = callback
 #             callback = None
 #         log.err(
-#             '%s subscription for callback %s' % (self.parent.friendlyName, callback))
+#             '%s subscription for callback %s' % (
+#                                     self.parent.friendlyName, callback))
         if (self.subscription_timeout_range[0] is not None and
                 timeout < self.subscription_timeout_range[0]):
             timeout = self.subscription_timeout_range[0]
@@ -283,10 +284,11 @@ class Service(object):
 
     def notify(self, prop):
 
-#         if hasattr(self, 'parent'):
-#             log.err('%s notify: %s' % (self.parent.friendlyName, self.subscriptions))
-#         log.msg('svc notify')
-#         log.msg(self.subscriptions)
+        #  if hasattr(self, 'parent'):
+        #      log.err('%s notify: %s' % (
+        #                       self.parent.friendlyName, self.subscriptions))
+        #  log.msg('svc notify')
+        #  log.msg(self.subscriptions)
         for sid, subscription_list in self.subscriptions.items():
             for i, subscription in enumerate(subscription_list):
                 if subscription.expired:
@@ -331,15 +333,17 @@ class Service(object):
 
     def dumps(self, force=False):
         if self.__class__._description is None or force:
-            self.__class__._description = '<?xml version="1.0" encoding="utf-8"?>' + \
-                                          et.tostring(self.dump())
+            self.__class__._description =\
+                '<?xml version="1.0" encoding="utf-8"?>' +\
+                et.tostring(self.dump())
         return self.__class__._description
 
 
 def notify(cls, prop):
 
-#     if hasattr(cls, 'parent'):
-#         log.err('%s notify: %s' % (cls.parent.friendlyName, cls.subscriptions))
+    #  if hasattr(cls, 'parent'):
+    #      log.err('%s notify: %s' % (
+    #                           cls.parent.friendlyName, cls.subscriptions))
     log.msg('svc notify')
     for sid, subscription_list in cls.subscriptions.items():
         for i, subscription in enumerate(subscription_list):
@@ -503,6 +507,7 @@ if __name__ == '__main__':
 
     class obj(object):
         pass
+
     class test2(Service):
         pass
     test = test2(
@@ -525,11 +530,11 @@ if __name__ == '__main__':
 #         test.stateVariables[0].dataType,
 #         test.stateVariables[0].allowedValues))
 #     print(dir(test.soap_service))
-    for k,v in test.soap_functions.items():
-        print('%s --> %s' % (k,v))
+    for k, v in test.soap_functions.items():
+        print('%s --> %s' % (k, v))
 #     print(test.soap_functions)
     print(test.resource)
-    
+
     reactor.listenTCP(  # @UndefinedVariable
         8000,
         Site(test.control_resource),

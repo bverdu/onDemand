@@ -2,7 +2,7 @@
 '''
 Created on 29 déc. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 from twisted.python import log
@@ -309,7 +309,7 @@ class MpdFactory(ReconnectingClientFactory):
 #             i = self.call('idle')
 #             i.addCallback(self._event)
 
-        log.msg('Mpdsend:%s' % command, loglevel='info')
+        log.msg('Mpdsend:%s' % command, loglevel=logging.INFO)
         #             print(command)
         if params is None:
             c = command

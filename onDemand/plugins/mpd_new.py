@@ -1,122 +1,25 @@
+# encoding: utf-8
 '''
 Created on 23 avr. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import os
 from collections import OrderedDict
 from lxml import etree as et
-from twisted.python import log
-from twisted.protocols.basic import LineReceiver
+from twisted.logger import Logger
 from twisted.internet.protocol import ReconnectingClientFactory
-from twisted.internet import defer, reactor, utils
+# from twisted.internet.endpoints import connectProtocol
+from twisted.internet import defer, reactor, utils, task
 from upnpy_spyne.utils import didl_decode, didl_encode, id_array, dict2xml
+from onDemand.protocols.mpd import MpdProtocol
 from onDemand.utils import Timer, \
     mpd_decode, \
     mpdtime_to_upnptime, \
     upnptime_to_mpdtime, \
     get_default_v4_address
 
-
-class MpdProtocol(LineReceiver):
-    '''
-    Twisted protocol to control remote mpd server
-    '''
-
-    def __init__(self):
-        '''
-        doc
-        '''
-        self.delimiter = "\n"
-        self.deferreds = []
-        self.buff = {}
-        self.idle = False
-        self.list_index = 0
-
-    def connectionLost(self, reason):
-        log.err('connection lost : %s' % reason)
-        self._event({'changed': 'disconnected'})
-        self.idle = False
-        try:
-            d = self.deferreds.pop(0)
-        except:
-            pass
-        else:
-            d.errback(reason)
-
-    def connectionMade(self):
-        log.msg('connected')
-
-    def addCallback(self, d):
-        self.deferreds.append(d)
-
-    def noidle(self):
-        d = defer.Deferred()
-        d.addCallback(lambda ignored: ignored)
-        self.deferreds.insert(0, d)
-        self.sendLine('noidle')
-        self.idle = False
-#         print('noidle')
-
-    def set_idle(self):
-        self.sendLine('idle')
-        self.idle = True
-#         print('idle')
-
-    def lineReceived(self, line):
-        #  print(line)
-        if line.startswith('OK MPD'):
-            self._event({'changed': 'connected'})
-        elif line.startswith('OK'):
-            #             print('deferred length: %d' % len(self.deferreds))
-            self.list_index = 1
-            try:
-                d = self.deferreds.pop(0)
-            except:
-                self.set_idle()
-                self._event(self.buff)
-                self.buff = {}
-                return
-            else:
-                d.callback(self.buff)
-            self.buff = {}
-        elif line.startswith('ACK'):
-            #             print('deferred length: %d' % len(self.deferreds))
-            try:
-                d = self.deferreds.pop(0)
-            except:
-                self.set_idle()
-                self._event({'Error': line.split('}')[1]})
-                self.buff = {}
-                return
-            else:
-                d.errback(Exception(line.split('}')[1]))
-            self.buff = {}
-        else:
-            if len(line) > 0:
-                k = line.split(':')[0]
-                if isinstance(self.buff, list):
-                    if k in self.buff[self.list_index]:
-                        self.list_index += 1
-                        self.buff.append({})
-                    self.buff[self.list_index].update(
-                        {k: ' '.join(line.split()[1:])})
-                else:
-                    if k in self.buff:
-                        self.buff = [self.buff]
-                        self.list_index = 1
-                        self.buff.append({k: ' '.join(line.split()[1:])})
-#                         if str(self.list_index) + k in self.buff:
-#                             self.list_index += 1
-#                         self.buff.update(
-#                             {str(self.list_index) + line.split(':')[0]:
-#                              ' '.join(line.split()[1:])})
-                    else:
-                        self.buff.update(
-                            {k: ' '.join(line.split()[1:])})
-            return
-        if len(self.deferreds) == 0:
-            self.set_idle()
+log = Logger(namespace='protocol.mpd')
 
 
 class Mpd_factory(ReconnectingClientFactory):
@@ -169,6 +72,7 @@ class Mpd_factory(ReconnectingClientFactory):
     old_vol = 0
     parent = None
     playlist = []
+    playlist_details = []
     reltime = '0:00:00.000'
     repeat = False
     room = 'Home'
@@ -186,8 +90,10 @@ class Mpd_factory(ReconnectingClientFactory):
     trackcount = 0
     tracksmax = 0
     transport_actions = ['PLAY']
+    coverdict = {}
+#     ohduration = 0
 
-    def __init__(self):
+    def __init__(self, cover_dir):
 
         self.connected = False
         self.proto = MpdProtocol()
@@ -197,6 +103,7 @@ class Mpd_factory(ReconnectingClientFactory):
         self.plsversion = '0'
         self.waiting = False
         self.calls = []
+        self.cover_dir = cover_dir
         self._sources = [OrderedDict(sorted(
             {'Name': '_'.join((self.name, n)),
              'Type': n,
@@ -228,22 +135,54 @@ class Mpd_factory(ReconnectingClientFactory):
 
     def update_playlist(self, playlist):
 
+        def format_track(track):
+            #             log.error('format: %s' % track['id'])
+            en = et.Element('Entry')
+            i = et.Element('Id')
+            if 'id' not in track:
+                log.critical('issue with playlist :%s' % track)
+            i.text = track['id'].decode('utf-8')
+            en.append(i)
+            uri = et.Element('Uri')
+            uri.text = track['url'].decode('utf-8')
+            en.append(uri)
+            md = et.Element('Metadata')
+            md.text = didl_encode(track)
+            en.append(md)
+            return en
+
+        def setter(res, pos):
+            #             print('playlist detail: %s %s' % (pos, res))
+            self.playlist_details[pos] = res
+
         if playlist is not None:
             if not isinstance(playlist, list):
                 playlist = [playlist]
             if int(self.status['playlistlength']) == 0:
                 self.playlist = []
+                self.playlist_details = []
             else:
                 delta = int(self.status['playlistlength']) - len(self.playlist)
 #                 print('delta= %d' % delta)
                 if delta >= 0:
                     for track in playlist:
+                        #                         self.cache_cover(track)
                         try:
                             if int(track['Pos']) >= len(self.playlist):
                                 self.playlist.append(int(track['Id']))
+                                d = self.call('playlistid', track['Id'])
+                                d.addCallback(self.get_cover, track['Id'])
+                                d.addCallback(mpd_decode)
+                                d.addCallback(format_track)
+                                d.addCallback(self.playlist_details.append)
                             else:
                                 self.playlist[int(
                                     track['Pos'])] = int(track['Id'])
+                                d = self.call('playlistid', track['Id'])
+                                d.addCallback(self.get_cover)
+                                d.addCallback(mpd_decode)
+                                d.addCallback(format_track)
+                                d.addCallback(setter, int(track['Pos']))
                         except:
                             continue
                 else:
@@ -252,13 +191,20 @@ class Mpd_factory(ReconnectingClientFactory):
                             continue
                         if track == {}:
                             self.playlist.pop()
+                            self.playlist_details.pop()
                             delta += 1
                             continue
                         if delta < 0:
                             self.playlist.pop(int(track['Pos']))
+                            self.playlist_details.pop(int(track['Pos']))
                             delta += 1
                         else:
                             self.playlist[int(track['Pos'])] = int(track['Id'])
+                            d = self.call('playlistid', track['Id'])
+                            d.addCallback(self.get_cover)
+                            d.addCallback(mpd_decode)
+                            d.addCallback(format_track)
+                            d.addCallback(setter, int(track['Pos']))
         self.idArray = id_array(self.playlist)
         self.oh_eventPLAYLIST(self.idArray, 'idarray')
 
@@ -272,7 +218,7 @@ class Mpd_factory(ReconnectingClientFactory):
         d = None
         for evt in events:
             if evt == 'Error':
-                log.err(events[evt])
+                log.error('bad event: {name}', name=events[evt])
                 return
             elif evt == 'changed':
                 chg = events[evt]
@@ -351,7 +297,7 @@ class Mpd_factory(ReconnectingClientFactory):
         if 'state' in changed:
             self.set_state(state['state'])
         if "volume" in changed:
-            log.msg('volume changed', loglevel='debug')
+            log.debug('volume changed')
             vol = int(state['volume'])
             if vol != self._volume:
                 if vol != 0:
@@ -359,7 +305,7 @@ class Mpd_factory(ReconnectingClientFactory):
                     muted = False
                 else:
                     muted = True
-                log.msg('send volume', loglevel='debug')
+                log.debug('send volume')
                 self.oh_eventVOLUME(self._volume, 'volume')
                 self.upnp_eventRCS(self._volume, 'Volume')
                 if muted is not self._muted:
@@ -370,7 +316,8 @@ class Mpd_factory(ReconnectingClientFactory):
         if 'songid' in changed:
             self.update_metadata(state['songid'])
         if 'repeat' in changed:
-            log.err('************repeat***********: %s' % bool(int(state['repeat'])))
+            #             log.debug('************repeat***********: %s' %
+            #                 bool(int(state['repeat'])))
             if self.repeat != bool(int(state['repeat'])):
                 self.repeat = bool(int(state['repeat']))
                 if not self.shuffle:
@@ -382,7 +329,8 @@ class Mpd_factory(ReconnectingClientFactory):
                                       else 'NORMAL SHUFFLE', 'CurrentPlayMode')
                 self.oh_eventPLAYLIST(self.repeat, 'repeat')
         if 'random' in changed:
-            log.err('************shuffle***********: %s' % bool(int(state['random'])))
+            log.debug('************shuffle***********: %s' %
+                      bool(int(state['random'])))
             if self.shuffle != bool(int(state['random'])):
                 self.shuffle = bool(int(state['random']))
                 if not self.repeat:
@@ -411,20 +359,21 @@ class Mpd_factory(ReconnectingClientFactory):
                 self.samplerate = sr
                 self.oh_eventINFO(sr, 'samplerate')
             except:
-                log.err('Bad Samplerate: %s' % state['audio'].split(':')[0])
+                log.critical('Bad Samplerate: %s' %
+                             state['audio'].split(':')[0])
             try:
                 bd = int(state['audio'].split(':')[1])
                 self.bitdepth = bd
                 self.oh_eventINFO(bd, 'bitdepth')
             except:
-                log.err('Bad Bitdepth: %s' % state['audio'].split(':')[1])
+                log.critical('Bad Bitdepth: %s' % state['audio'].split(':')[1])
 
     def update_state(self):
         #  log.err('Update State: %s' % self.mpd.status['state'])
         self.set_state(self.status['state'])
 
     def update_metadata(self, songid=None):
-        log.msg('update metadata')
+        log.debug('update metadata')
 
         def getmd(md):
             if isinstance(md, list):
@@ -434,8 +383,8 @@ class Mpd_factory(ReconnectingClientFactory):
                 md = nd
             if md != self._metadata:
                 self._metadata = md
-#                 log.err(md)
-                self.metadata.update(mpd_decode(self._metadata))
+#                 log.error(unicode(md))
+                self.metadata = mpd_decode(self._metadata)
                 if self._track_duration != self.metadata['duration']:
                     self._track_duration = self.metadata['duration']
                     self.upnp_eventAV(self._track_duration,
@@ -483,6 +432,7 @@ class Mpd_factory(ReconnectingClientFactory):
             d = self.call('playlistid', songid)
         else:
             d = self.call('currentsong')
+        d.addCallback(self.get_cover)
         d.addCallback(getmd)
 
     def update_mimetypes(self):
@@ -552,60 +502,66 @@ class Mpd_factory(ReconnectingClientFactory):
                     continue
             return dic
 
-        d = self.call('sticker', ' '.join(('list song', url.join('"'*2))))
+        d = self.call('sticker', ' '.join(('list song', url.join('"' * 2))))
         d.addBoth(got_sticker, dic)
         return d
 
+#     def get_tracks(self, tracks):
+#
+#         def generate_tracklist(tracks, tracklist=None):
+#             if not isinstance(tracks, list):
+#                 tracks = [tracks]
+#             tl = et.Element('TrackList')
+#             for idx, track in enumerate(tracks):
+#                 if isinstance(track, dict):
+#                     track = mpd_decode(track)
+#                 else:
+#                     nd = {}
+#                     for d in track:
+#                         nd.update(d)
+#                     track = mpd_decode(nd)
+#                 en = et.Element('Entry')
+#                 i = et.Element('Id')
+#                 if 'id' not in track:
+#                     if tracklist:
+#                         track.update({'id': str(tracklist[idx])})
+#                     else:
+#                         log.critical('issue with playlist :%s' % track)
+#                 i.text = track['id'].decode('utf-8')
+#                 en.append(i)
+#                 uri = et.Element('Uri')
+#                 uri.text = track['url'].decode('utf-8')
+#                 en.append(uri)
+#                 md = et.Element('Metadata')
+#                 md.text = didl_encode(track)
+#                 en.append(md)
+#                 tl.append(en)
+#             log.debug('tracklist generated')
+#             return et.tostring(tl)
+#         tl = []
+#         for track in tracks:
+#             t = self.call('playlistid', str(track))
+#             t.addCallback(self.get_cover)
+#             tl.append(t)
+#         d = defer.gatherResults(tl)
+#         d.addCallback(generate_tracklist)
+#         return d
+
     def get_tracks(self, tracks):
 
-        def got_tracks(tracks):
-            if not isinstance(tracks, list):
-                tracks = [tracks]
-            sl = []
-            for track in tracks:
-                t = mpd_decode(track)
-                sl.append(self.get_sticker(t['url'], t))
-            return defer.gatherResults(sl)
-
-        def generate_tracklist(tracks, tracklist=None):
-            if not isinstance(tracks, list):
-                tracks = [tracks]
-            tl = et.Element('TrackList')
-            for idx, track in enumerate(tracks):
-                if isinstance(track, dict):
-                    track = mpd_decode(track)
-                else:
-                    # log.err(track)
-                    nd = {}
-                    for d in track:
-                        #  log.err(d)
-                        nd.update(d)
-                    track = mpd_decode(nd)
-#                     log.msg(nd)
-                en = et.Element('Entry')
-                i = et.Element('Id')
-                if 'id' not in track:
-                    if tracklist:
-                        track.update({'id': str(tracklist[idx])})
-                    else:
-                        log.err('issue with playlist :%s' % track)
-                i.text = track['id'].decode('utf-8')
-                en.append(i)
-                uri = et.Element('Uri')
-                uri.text = track['url'].decode('utf-8')
-                en.append(uri)
-                md = et.Element('Metadata')
-                md.text = didl_encode(track)
-                en.append(md)
-                tl.append(en)
-            return et.tostring(tl)
-        tl = []
+        tl = et.Element('TrackList')
         for track in tracks:
-            tl.append(self.call('playlistid', str(track)))
-        d = defer.gatherResults(tl)
-        #  d.addCallback(got_tracks)
-        d.addCallback(generate_tracklist)
-        return d
+            #             print(self.playlist.index(int(track)))
+            #             print(len(self.playlist), len(self.playlist_details))
+            try:
+                tl.append(
+                    self.playlist_details[self.playlist.index(int(track))])
+            except IndexError:
+                log.debug('ouye!!!')
+                return task.deferLater(reactor, 10, self.get_tracks, tracks)
+        r = et.tostring(tl)
+        log.debug('tracklist generated')
+        return r
 
     def get_track(self, track=None):
 
@@ -613,12 +569,80 @@ class Mpd_factory(ReconnectingClientFactory):
             uri = res['url']
             return (uri, didl_encode(res))
         if track is None:
-            d = defer.succeed((self._track_URI, self.metadata_str))
+            return self._track_URI, self.metadata_str
+#             d = defer.succeed((self._track_URI, self.metadata_str))
         else:
             d = self.call('playlistid', str(track))
+            d.addCallback(self.get_cover)
             d.addCallback(mpd_decode)
             d.addCallback(got_result)
         return d
+
+    def cache_cover(self, track):
+        if 'file' in track:
+            if track['file'] in self.coverdict:
+                if self.coverdict[track['file']]:
+                    return
+            fpng = os.path.join(
+                self.cover_dir,
+                os.path.split(track['file'])[-2],
+                'cover.png')
+            fjpg = os.path.join(
+                self.cover_dir,
+                os.path.split(track['file'])[-2],
+                'cover.jpg')
+#             log.error(fpng)
+            if os.path.exists(fjpg):
+                url = self.parent.parent.register_art_url(fjpg)
+            elif os.path.exists(fpng):
+                url = self.parent.parent.register_art_url(fpng)
+            else:
+                url = None
+            log.debug(
+                'url for {file} cached:{url}', file=track['file'], url=url)
+            self.coverdict.update({track['file']: url})
+
+    def get_cover(self, track, id=None):
+        if isinstance(track, list):
+            d = {}
+            for dic in track:
+                d.update(dic)
+            track = d
+#             print('concatened: %s' % track)
+        if 'Id' not in track:
+            if id:
+                track.update({'Id': id})
+            else:
+                log.error('no id')
+        if 'file' in track:
+            if track['file'] in self.coverdict:
+                if self.coverdict[track['file']]:
+                    track.update(
+                        {'albumArtURI': self.coverdict[track['file']]})
+                    log.debug(track['albumArtURI'])
+                return track
+            fpng = os.path.join(
+                self.cover_dir,
+                os.path.split(track['file'])[-2],
+                'cover.png')
+            fjpg = os.path.join(
+                self.cover_dir,
+                os.path.split(track['file'])[-2],
+                'cover.jpg')
+            if os.path.exists(fjpg):
+                url = self.parent.parent.register_art_url(fjpg)
+                track.update({'albumArtURI': url})
+                log.debug('get cover: {track}', track=url)
+            elif os.path.exists(fpng):
+                url = self.parent.parent.register_art_url(fpng)
+                track.update({'albumArtURI': url})
+                log.debug('get cover: {track}', track=url)
+            else:
+                url = None
+            self.coverdict.update({track['file']: url})
+        if 'albumArtURI' in track:
+            log.debug(track['albumArtURI'])
+        return track
 
     def get_relcount(self):
         return 2147483647
@@ -627,7 +651,7 @@ class Mpd_factory(ReconnectingClientFactory):
         return 2147483647
 
     def get_abstime(self):
-            return '00:00:00'
+        return '00:00:00'
 
     def get_reltime(self, fmt='UPNP'):
         if self.timer is not None:
@@ -643,7 +667,6 @@ class Mpd_factory(ReconnectingClientFactory):
                 t = self.reltime
             else:
                 t = self.seconds
-#         log.err('reltime: %s' % t)
         return t
 
     def get_volume(self):
@@ -656,7 +679,6 @@ class Mpd_factory(ReconnectingClientFactory):
 
         def convert_volume(vol):
             self._volume = int(float(vol) * 100)
-#             log.msg("volume= %d" % self._volume, loglevel='debug')
             return self._volume
 
         d = self.mediaplayer.get("Volume",
@@ -665,7 +687,7 @@ class Mpd_factory(ReconnectingClientFactory):
         return d
 
     def get_transport_actions(self):
-            return {','.join(self.transport_actions)}
+        return {','.join(self.transport_actions)}
 
     def set_mimetypes(self, mtlist):
         if self._mtlist != mtlist:
@@ -679,8 +701,6 @@ class Mpd_factory(ReconnectingClientFactory):
         if metadata != self.metadata:
             self.metadata.update(metadata)
             if 'duration' in metadata.keys():
-#                 log.err('duration set to %s by metadata'
-#                         % metadata['duration'])
                 self._track_duration = metadata['duration']
             if 'url' in metadata.keys():
                 self._track_URI = metadata['url']
@@ -694,7 +714,7 @@ class Mpd_factory(ReconnectingClientFactory):
         self.timer = None
 
     def set_state(self, state):
-        log.msg("SET NEW STATE : %s " % state, loglevel='debug')
+        log.debug("SET NEW STATE : %s " % state)
         if state == self._state:
             return
         self._state = state
@@ -732,15 +752,12 @@ class Mpd_factory(ReconnectingClientFactory):
             self.upnp_state = 'TRANSITIONNING'
             self.oh_state = 'Buffering'
         else:
-            #   log.err('Unknow State from player : %s' % state)
             return
-#         log.msg('send new state: %s' % self._state, loglevel='debug')
         self.upnp_eventAV(self.upnp_state, 'TransportState')
         self.oh_eventPLAYLIST(self.oh_state, 'transportstate')
 
     def set_songid(self, songid):
         self.songid = songid['Id']
-#         log.err('songid = %s' % songid)
         return self.songid
 
     def set_position(self, newpos, fmt='UPNP'):
@@ -754,7 +771,7 @@ class Mpd_factory(ReconnectingClientFactory):
             pos = upnptime_to_mpdtime(newpos)
         else:
             pos = newpos
-        log.err('seek to %s' % pos)
+        log.debug('seek to %s' % pos)
         d = self.call('seekcur', pos)
         d.addCallback(transition)
         return d
@@ -764,9 +781,9 @@ class Mpd_factory(ReconnectingClientFactory):
         self.set_position(newpos, fmt)
 
     def set_track_URI(self, uri, md=''):
-        log.msg("set track uri : %s " % uri, loglevel='debug')
+        log.debug("set track uri : %s " % uri)
         try:
-            log.msg("current uri : %s " % self._track_URI, loglevel='debug')
+            log.debug("current uri : %s " % self._track_URI)
         except:
             pass
         if uri != self._track_URI:
@@ -778,8 +795,8 @@ class Mpd_factory(ReconnectingClientFactory):
             d.addCallback(self.play)
 
     def playing(self, *ret):
-            log.msg('playing...', loglevel='debug')
-            self.set_state('play')
+        log.debug('playing...')
+        self.set_state('play')
 
     def playindex(self, index):
         return self.play(songid=self.playlist[int(index)])
@@ -791,23 +808,23 @@ class Mpd_factory(ReconnectingClientFactory):
             return self.pause()
 
     def insert_metadata(self, md):
-            dic = didl_decode(md)
+        dic = didl_decode(md)
 #             log.err(dic)
-            for i, tag in enumerate(dic.keys()):
-                if tag.lower() in ('class', 'restricted', 'id', 'duration',
-                                   'parentid', 'protocolinfo', 'url',
-                                   'ownerudn'):
-                    continue
-                if not isinstance(dic[tag], str):
-                    continue
-                reactor.callLater(  # @UndefinedVariable
-                    float(i)/2,
-                    self.call,
-                    ' '.join(('sticker',
-                              'set song',
-                              dic['url'].join('"'*2),
-                              tag,
-                              '"' + dic[tag] + '"')))
+        for i, tag in enumerate(dic.keys()):
+            if tag.lower() in ('class', 'restricted', 'id', 'duration',
+                               'parentid', 'protocolinfo', 'url',
+                               'ownerudn'):
+                continue
+            if not isinstance(dic[tag], str):
+                continue
+            reactor.callLater(  # @UndefinedVariable
+                float(i) / 2,
+                self.call,
+                ' '.join(('sticker',
+                          'set song',
+                          dic['url'].join('"' * 2),
+                          tag,
+                          '"' + dic[tag] + '"')))
 
     def delete(self, songid):
         self.call('deleteid', str(songid))
@@ -842,6 +859,7 @@ class Mpd_factory(ReconnectingClientFactory):
     UPNP wrapped functions
     '''
     # onDemand vendor method
+
     def get_room(self):
         return self.room
 
@@ -890,10 +908,10 @@ class Mpd_factory(ReconnectingClientFactory):
         return 0
 
     def x_insert(self, afterid, url, metadata, checked=False):
-        log.err('Insert :%s  --  %s  --  %s' % (afterid, url, metadata))
+        log.debug('Insert :%s  --  %s  --  %s' % (afterid, url, metadata))
 
         def inserted(res, md):
-            log.err(res)
+            log.debug(res)
             return res['Id']
 
         if 'youtube' in url and not checked:
@@ -915,11 +933,14 @@ class Mpd_factory(ReconnectingClientFactory):
         elif int(afterid) == 0:
             d = self.call('addid', url + ' 0')
         else:
-            log.err('crash ? %s' % self.playlist)
-            log.err('here ? %s' % str(self.playlist.index(int(afterid))+1))
+            log.critical('crash ? %s' % self.playlist)
+            log.critical('here ? %s' %
+                         str(self.playlist.index(int(afterid)) + 1))
             d = self.call(
                 'addid',
-                ' '.join((url.encode('utf-8'), str(self.playlist.index(int(afterid))+1))))
+                ' '.join(
+                    (url.encode('utf-8'),
+                     str(self.playlist.index(int(afterid)) + 1))))
         d.addCallback(inserted, metadata)
         return d
 
@@ -933,16 +954,17 @@ class Mpd_factory(ReconnectingClientFactory):
             self.call('next')
 
     def x_play(self, instanceID=0, speed=1, songid=None,
-             ignored=None):
+               ignored=None):
 
-        log.err('entering play...')
+        log.debug('entering play...')
+
         def success(result):
             return None
         if self.cancelplay:
             self.cancelplay = False
         else:
             if songid is not None:
-#                 log.err(songid)
+                #                 log.err(songid)
                 d = self.call('playid', str(songid))
             else:
                 if self._state == 'pause':
@@ -953,6 +975,7 @@ class Mpd_factory(ReconnectingClientFactory):
 
     def x_pause(self, instanceID=0):
         print('pause')
+
         def paused(ret):
             if self._state == 'play':
                 self.set_state('pause')
@@ -967,10 +990,12 @@ class Mpd_factory(ReconnectingClientFactory):
         return self.protocolinfo
 
     def x_read(self, value):
+        log.debug('read')
         d = self.get_track(value)
         return (d,)
 
     def x_read_list(self, items):
+        log.debug('readlist')
         d = self.get_tracks(
             [int(track) for track in items.split()])
         return d
@@ -982,15 +1007,15 @@ class Mpd_factory(ReconnectingClientFactory):
         raise NotImplementedError()
 
     def x_seek(self, instanceID, unit, pos):
-        log.msg('seek: %s %s' % (unit, pos), loglevel='debug')
+        log.debug('seek: %s %s' % (unit, pos))
         self.set_position(pos)
 
     def x_seek_id(self, value):
-        log.err('SeekId')
+        log.debug('SeekId')
         return self.x_play(songid=value)
 
     def x_seek_index(self, value):
-        log.err('Seekindex')
+        log.debug('Seekindex')
         return self.playindex(value)
 
     def x_seek_second_absolute(self, value):
@@ -1015,7 +1040,7 @@ class Mpd_factory(ReconnectingClientFactory):
 
     def x_stop(self, instanceID=0):
         def stopped(ret):
-                self.set_state('stop')
+            self.set_state('stop')
         if self._state != 'STOPPED':
             d = self.call('stop')
             self.reltime = '00:00:00'
@@ -1050,6 +1075,7 @@ class Mpd_factory(ReconnectingClientFactory):
     '''
     Rendering Control and Open Home Volume
     '''
+
     def x_volume(self):
         return self._volume
 
@@ -1057,7 +1083,7 @@ class Mpd_factory(ReconnectingClientFactory):
         volume = str(volume)
         d = self.call('setvol', volume)
         d.addErrback(
-            log.msg,
+            log.critical,
             'Set Volume Error : %s - %d' % (channel, int(volume)))
         reactor.callLater(0.1,  # @UndefinedVariable
                           self.changed_state,
@@ -1114,6 +1140,7 @@ class Mpd_factory(ReconnectingClientFactory):
     '''
     OpenHome Time
     '''
+
     def x_time(self):
         return (self.trackcount, self.ohduration, self.get_reltime('seconds'))
 
@@ -1122,51 +1149,51 @@ class Mpd_factory(ReconnectingClientFactory):
     '''
 
     def x_manufacturer(self=None):
-        log.err('Manufacturer from Product')
+        log.debug('Manufacturer from Product')
         return (self.parent.manufacturer,
                 self.parent.manufacturerInfo, self.parent.manufacturerURL,
                 ''.join((self.parent.getLocation(get_default_v4_address()),
                          '/pictures/icon.png')),)
 
     def x_model(self=None):
-        log.err('Model from Product')
+        log.debug('Model from Product')
         return (self.parent.modelName, self.parent.modelDescription,
                 self.parent.manufacturerURL,
                 ''.join((self.parent.getLocation(get_default_v4_address()),
                          '/pictures/', self.parent.modelName, '.png',)))
 
     def x_product(self):
-        log.err('Product from Product')
+        log.debug('Product from Product')
         return self.room, self.parent.modelName, self.parent.modelDescription,\
             self.parent.manufacturerURL,\
             ''.join((self.parent.getLocation(get_default_v4_address()),
-                '/pictures/', self.parent.modelName, '.png',))
+                     '/pictures/', self.parent.modelName, '.png',))
 
     def x_standby(self):
-        log.err('Standby from Product')
+        log.debug('Standby from Product')
         return self.standby
 
     def x_set_standby(self, val=None):
-        log.err('SetStandby from Product')
+        log.debug('SetStandby from Product')
         if val is None:
             return self.standby
         raise NotImplementedError()
 
     def x_source_count(self):
-        log.err('SourceCount from Product')
+        log.debug('SourceCount from Product')
         return len(self.sources)
 
     def x_source_xml(self, *args, **kwargs):
-        log.err('SourceXml from Product')
+        log.debug('SourceXml from Product')
         return self.sourcexml
-#         return dict2xml({'SourceList': [{'Source': n} for n in self.sources]})
+# return dict2xml({'SourceList': [{'Source': n} for n in self.sources]})
 
     def x_source_index(self):
-        log.err('SourceIndex from Product')
+        log.debug('SourceIndex from Product')
         return self.sourceindex
 
     def x_set_source_index(self, idx=None):
-        log.err('SetSourceIndex from Product')
+        log.debug('SetSourceIndex from Product')
         if idx is None:
             return self.sourceindex
         else:
@@ -1179,10 +1206,10 @@ class Mpd_factory(ReconnectingClientFactory):
                         self.sourceindex = i
                         self.oh_product_event('sourceindex', self.sourceindex)
                         return
-                    log.err('Unknown Source: %s' % idx)
+                    log.critical('Unknown Source: %s' % idx)
 
     def x_set_source_index_by_name(self, value):
-        log.err('SetSourceIndexByName from Product')
+        log.debug('SetSourceIndexByName from Product')
         return self.set_source_index(value)
 
     def x_source(self, idx):
@@ -1198,13 +1225,23 @@ class Mpd_factory(ReconnectingClientFactory):
         raise NotImplementedError()
 
 
-def get_Mpd(addr='127.0.0.1', port=6600):
-    f = Mpd_factory()
-    reactor.connectTCP(addr, port, f)  # @UndefinedVariable
+def get_Mpd(addr='127.0.0.1', port=6600, cover_dir='/var/lib/mpd/'):
+    f = Mpd_factory(cover_dir=cover_dir)
+    if addr.startswith('/') or addr.startswith('~'):
+        reactor.connectUNIX(addr, f)  # @UndefinedVariable
+#         from twisted.internet.endpoints import UNIXClientEndpoint
+#         edp = UNIXClientEndpoint(reactor, addr)
+#         edp.connect(f)
+    else:
+        reactor.connectTCP(addr, port, f)  # @UndefinedVariable
+#         from twisted.internet.endpoints import TCP4ClientEndpoint
+#         edp = TCP4ClientEndpoint(reactor, addr, port)
+#         edp.connect(f)
+
     return None, f
 
 if __name__ == '__main__':
-#     from twisted.internet.task import deferLater
+    #     from twisted.internet.task import deferLater
 
     def print_fct(result):
         print('func result: %s' % result)
@@ -1226,14 +1263,14 @@ if __name__ == '__main__':
 
     def test():
         if mpd.connected:
-#             for i in xrange(5):
-#                 d = deferLater(reactor,
-#                                i,
-#                                mpd.call,
-#                                *('pause', str(int(i % 2))))
-#                 d.addCallback(print_fct)
-#             d = mpd.call('stop')
-#             d.addCallback(print_fct)
+            #             for i in xrange(5):
+            #                 d = deferLater(reactor,
+            #                                i,
+            #                                mpd.call,
+            #                                *('pause', str(int(i % 2))))
+            #                 d.addCallback(print_fct)
+            #             d = mpd.call('stop')
+            #             d.addCallback(print_fct)
             d = mpd.call('status')
             d.addCallback(print_fct)
 #             d = mpd.call('stop')
@@ -1244,11 +1281,17 @@ if __name__ == '__main__':
 #             d.addCallback(print_fct)
 #             d = mpd.call('playlistinfo')
 #             d.addCallback(print_fct)
-#             d = mpd.call('addid http://192.168.0.10:8200/MediaItems/2108.flac')
+#             d = mpd.call(
+#                 'addid http://192.168.0.10:8200/MediaItems/2108.flac')
 #             d.addCallback(print_fct)
-#             d = mpd.call('sticker', 'set song "http://192.168.0.10:8200/MediaItems/2108.flac" toto tata')
+#             d = mpd.call(
+#                 'sticker',
+#                 'set song "http://192.168.0.10:8200/MediaItems/2108.flac"
+#                     toto tata')
 #             d.addCallback(print_fct)
-#             d = mpd.call('sticker', 'list song "http://192.168.0.10:8200/MediaItems/2108.flac"')
+#             d = mpd.call(
+#                 'sticker',
+#                 'list song "http://192.168.0.10:8200/MediaItems/2108.flac"')
 #             d.addCallback(print_fct)
 #             d = mpd.call('seekcur', '25')
 #             d.addCallback(print_fct)

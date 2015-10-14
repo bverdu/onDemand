@@ -1,7 +1,7 @@
 '''
 Created on 27 déc. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 from upnpy.event import EventProperty

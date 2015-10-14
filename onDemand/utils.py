@@ -3,46 +3,94 @@
 '''
 Created on 14 nov. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import os
 import time
 import ConfigParser
 from datetime import datetime, timedelta
-from twisted.python import log
+from twisted.logger import Logger
 from twisted.internet import task
 from mimetypes import guess_type
 from upnpy_spyne.utils import get_default_v4_address
 import config
 
+log = Logger()
 
-def load_yaml(datapath):
+
+def dictdiffupdate(old, new):
+    diff = {}
+    for k, v in new.iteritems():
+        if k not in old:
+            #  print('not: %s' % k)
+            diff.update({k: v})
+        elif isinstance(v, dict):
+            #  print('dict')
+            d = dictdiffupdate(old[k], v)
+            if len(d) > 0:
+                diff.update({k: d})
+        else:
+            #  print('basic')
+            if v != old[k]:
+                diff.update({k: v})
+    return diff
+
+
+def load_yaml(datapath, filename='map.conf', conf=config):
+
     import yaml
+
+    config.datadir = datapath
+
     try:
         from yaml import CLoader as Loader
     except ImportError:
         from yaml import Loader
     try:
         confmap = yaml.load(
-            open(os.path.join(datapath, 'map.conf')), Loader=Loader)
+            open(os.path.join(datapath, filename)), Loader=Loader)
     except:
         confmap = {}
-        log.err('No suitable map file found at %s/%s' % (datapath, 'map.conf'))
+        log.error('No suitable map file found at {path}',
+                  path='/'.join((datapath, filename)))
     try:
         scenarios = yaml.load(
             open(os.path.join(datapath, 'scenarios.conf')), Loader=Loader)
     except:
         scenarios = {}
-        log.err(
-            'No suitable scenario file found at %s/%s'
-            % (datapath, 'scenarios.conf'))
-#     print(confmap)
-#     print(scenarios)
-    config.hmodules = confmap['hmodules']
-    config.rooms = confmap['rooms']
-    config.media_types = confmap['config']['media_types']
-    config.network = confmap['config']['network']
-    config.cloud_user = confmap['config']['cloud_user']
+        log.error(
+            'No suitable scenario file found at {path}',
+            path='/'.join((datapath, 'scenarios.conf')))
+    #     print(confmap)
+    #     print(scenarios)
+    for setting, value in confmap.iteritems():
+        if setting == 'config':
+            for k, v in value.iteritems():
+                setattr(conf, k, v)
+        else:
+            setattr(conf, setting, value)
+
+
+def save_yaml(datapath, filename='map.conf', conf=config):
+
+    import yaml
+
+    try:
+        from yaml import CDumper as Dumper
+    except ImportError:
+        from yaml import Dumper
+
+    settings = ('auto', 'media_types', 'controller', 'lirc', 'first_start',
+                'network', 'cloud_user', 'cloud_secret', 'shared_dirs')
+    dic = {'config': {}}
+    for attr, value in conf.__dict__.iteritems():
+        if not attr.startswith('_'):
+            if attr in settings:
+                dic['config'].update({attr: value})
+            else:
+                dic.update({attr: value})
+    yaml.dump(dic, open(os.path.join(datapath, filename), 'w+'), Dumper=Dumper)
+    #     log.debug('{doc}', doc=yaml.dump(dic))
 
 
 def load_config(datapath):
@@ -70,9 +118,9 @@ def load_config(datapath):
                             if len(f) > 0:
                                 config.triggers[option] = {'functions': f}
                 elif section in ('lirc', 'mpd'):
-                        setattr(config,
-                                section + '_' + option,
-                                parser.get(section, option))
+                    setattr(config,
+                            section + '_' + option,
+                            parser.get(section, option))
 #     print(config.lirc_emitter)
 #     print(config.triggers)
 
@@ -90,22 +138,22 @@ def mpdtime_to_upnptime(mpdtime, playing='', reltime='0:00:00.000'):
         return reltime
     if playing == 'PLAYING':
         # Dirty workaround, shame on me !
-        hrs = mpdtime/3600
-        mn = (mpdtime-hrs*3600)/60
-        sec = (mpdtime-mn*60) + 2
+        hrs = mpdtime / 3600
+        mn = (mpdtime - hrs * 3600) / 60
+        sec = (mpdtime - mn * 60) + 2
         if len(st.split('.')) > 1:
-            msec = '.'+'{:0<3}'.format(st.split('.')[1][:3])
+            msec = '.' + '{:0<3}'.format(st.split('.')[1][:3])
         else:
             msec = '.000'
         return ':'.join(['{:0>2}'.format(str(hrs)),
                          '{:0>2}'.format(str(mn)),
                          '{:0>2}'.format(str(sec))]) + msec
     else:
-        hrs = mpdtime/3600
-        mn = (mpdtime-hrs*3600)/60
-        sec = (mpdtime-mn*60)
+        hrs = mpdtime / 3600
+        mn = (mpdtime - hrs * 3600) / 60
+        sec = (mpdtime - mn * 60)
         if len(st.split('.')) > 1:
-            msec = '.'+'{:0<3}'.format(st.split('.')[1][:3])
+            msec = '.' + '{:0<3}'.format(st.split('.')[1][:3])
         else:
             msec = '.000'
         return ':'.join(['{:0>2}'.format(str(hrs)),
@@ -121,7 +169,7 @@ def upnptime_to_mpdtime(upnptime):
 #             + '.' + '{:0<3}'.format(tim[1][:3])
 #     else:
 #         mpdtime = str(int(hmsm[0])*3600+int(hmsm[1])*60+int(hmsm[2]))
-    mpdtime = str(int(hmsm[0])*3600+int(hmsm[1])*60+int(hmsm[2]))
+    mpdtime = str(int(hmsm[0]) * 3600 + int(hmsm[1]) * 60 + int(hmsm[2]))
     return mpdtime
 
 
@@ -130,14 +178,15 @@ def mpristime_to_upnptime(mprtime, playing='', reltime='0:00:00.000'):
         mprtime = int(mprtime)
     except:
         return reltime
-    tmst = (timedelta(hours=-1)+datetime.fromtimestamp(mprtime/1000000.000000))
+    tmst = (
+        timedelta(hours=-1) + datetime.fromtimestamp(mprtime / 1000000.000000))
     if playing == 'Playing':
         # Dirty workaround, shame on me !
         return str(tmst.hour)\
             + ':'\
             + '{:0>2}'.format(str(tmst.minute))\
             + ':'\
-            + '{:0>2}'.format(str(tmst.second+2))\
+            + '{:0>2}'.format(str(tmst.second + 2))\
             + '.'\
             + str(tmst.microsecond)
     else:
@@ -155,7 +204,7 @@ def upnptime_to_mpristime(upnptime):
     hmsm = tim[0].split(':')
     if len(tim) > 1:
         mpristime = (int(hmsm[0]) * 3600 + int(hmsm[1])
-                     * 60+int(hmsm[2]))\
+                     * 60 + int(hmsm[2]))\
             * 1000000 + int('{:0<6}'.format(tim[1]))
     else:
         mpristime = (int(hmsm[0]) * 3600 + int(hmsm[1])
@@ -180,7 +229,7 @@ def mpris_decode(dic):
                 d.update({key[1]: unicode(dic[k])})
         else:
             d.update({k: unicode(dic[k])})
-            log.msg('unknown tag: %s' % k)
+            log.warn('unknown tag: %s' % k)
     return d
 
 
@@ -193,17 +242,22 @@ def mpris_encode(dic):
             d.update({'mpris:length': dic[k]})
         else:
             if k in xesam:
-                d.update({'xesam:'+k: dic[k]})
+                d.update({'xesam:' + k: dic[k]})
     return d
 
 
 def mpd_decode(dic):
     d = {}
+    if isinstance(dic, list):
+        log.error('bad info: {dic}', dic=dic)
+        return d
     for k in dic.keys():
+        if k == 'albumArtURI':
+            d.update({k: dic[k]})
         if k == 'Time':
-            hrs = int(dic[k])/3600
-            mn = (int(dic[k])-hrs*3600)/60
-            sec = (int(dic[k])-mn*60)
+            hrs = int(dic[k]) / 3600
+            mn = (int(dic[k]) - hrs * 3600) / 60
+            sec = (int(dic[k]) - mn * 60)
             t = ':'.join(['{:0>2}'.format(str(hrs)),
                           '{:0>2}'.format(str(mn)),
                           '{:0>2}'.format(str(sec))])
@@ -245,108 +299,102 @@ def dbus_func_failed(err, func):
         msg = err.getErrorMessage()
     except AttributeError:
         msg = err.message
-    log.err('dbus call function : %s failed: %s' % (func, msg))
+    log.error('dbus call function : %s failed: %s' % (func, msg))
 
 
 def trigger(obj, func, name, *args):
     from twisted.internet import reactor
-    
+
     def cleanState(res, obj, typ=2):
-        log.msg('clean state: %s' % obj, loglevel='debug')
+        log.debug('clean state: {obj}', obj=obj)
         if typ in (0, 2):
             try:
                 config.state.remove(obj)
             except:
-                log.msg('%s not in state' % obj, loglevel='debug')
+                log.debug('%s not in state' % obj)
         if typ in (1, 2):
             if obj in config.cancellable.keys():
                 k = config.cancellable.pop(obj)
                 for d in k:
-                    log.msg('deferred %s not cancellable anymore' % d,
-                            loglevel='debug')
+                    log.debug('deferred %s not cancellable anymore' % d)
                 del k
-        log.msg('cancellable: %s' % config.cancellable,
-                loglevel='debug')
+        log.debug('cancellable: %s' % config.cancellable)
 
     if name in config.triggers.keys():
-                if name == config.last:
+        if name == config.last:
+            return func(*(args))
+        config.last = name
+        log.debug('enter trigger %s ' % name)
+        maxtime = 0.0
+        for el in config.triggers[name]['functions']:
+            fct = getattr(obj, el['name'])
+            fargs = el['args']
+            if el['state'] is not None:
+                if el['state'] in config.state:
+                    if '-' + el['state'] in config.cancellable.keys():
+                        k = config.cancellable.pop('-' + el['state'])
+                        for d in k:
+                            log.debug('cancelling : %s' % d)
+                            d.cancel()
+                        del k
                     return func(*(args))
-                config.last = name
-                log.msg('enter trigger %s ' % name, loglevel='info')
-                maxtime = 0.0
-                for el in config.triggers[name]['functions']:
-                    fct = getattr(obj, el['name'])
-                    fargs = el['args']
-                    if el['state'] is not None:
-                        if el['state'] in config.state:
-                            if '-' + el['state'] in config.cancellable.keys():
-                                k = config.cancellable.pop('-'+el['state'])
-                                for d in k:
-                                    log.msg('cancelling : %s' % d,
-                                            loglevel='debug')
-                                    d.cancel()
-                                del k
-                            return func(*(args))
-                        elif el['state'][1:] in config.state:
-                            if el['time'] > 0:
-                                d = task.deferLater(reactor,
-                                                    el['time'],
-                                                    cleanState,
-                                                    *(None, el['state'][1:]))
-                        elif el['state'][0] != '-':
-                            config.state.append(el['state'])
-                            log.msg('append state: %s' % el['state'],
-                                    loglevel='debug')
+                elif el['state'][1:] in config.state:
+                    if el['time'] > 0:
+                        d = task.deferLater(reactor,
+                                            el['time'],
+                                            cleanState,
+                                            *(None, el['state'][1:]))
+                elif el['state'][0] != '-':
+                    config.state.append(el['state'])
+                    log.debug('append state: %s' % el['state'])
+                else:
+                    return func(*(args))
+                if el['time'] < 0:
+                    log.debug('eltime: %s' % el['time'])
+                    if -el['time'] > maxtime:
+                        maxtime = -el['time']
+                    for i in range(el['qty']):
+                        if el['state'] not in\
+                                config.cancellable.keys():
+                            config.cancellable[el['state']] = []
+                        if i > 0 or el['qty'] == 1:
+                            d = task.deferLater(
+                                reactor,
+                                float(i),
+                                fct,
+                                *(fargs))
+                            config.cancellable[el['state']].append(d)
+                            d.addBoth(cleanState,
+                                      *(el['state'], 1))
                         else:
-                            return func(*(args))
-                        if el['time'] < 0:
-                            log.msg('eltime: %s' % el['time'],
-                                    loglevel='debug')
-                            if -el['time'] > maxtime:
-                                maxtime = -el['time']
-                            for i in range(el['qty']):
-                                if el['state'] not in\
-                                        config.cancellable.keys():
-                                    config.cancellable[el['state']] = []
-                                if i > 0 or el['qty'] == 1:
-                                    d = task.deferLater(
-                                        reactor,
-                                        float(i),
-                                        fct,
-                                        *(fargs))
-                                    config.cancellable[el['state']].append(d)
-                                    d.addBoth(cleanState,
-                                              *(el['state'], 1))
-                                else:
-                                    reactor.callLater(  # @UndefinedVariable
-                                        float(i),
-                                        fct,
-                                        *(fargs))
-                        else:
-                            for i in range(el['qty']):
-                                dd = task.deferLater(
-                                    reactor,
-                                    float(el['time'])+float(i),
-                                    fct,
-                                    *(fargs))
-                                if el['state'] not in\
-                                        config.cancellable.keys():
-                                    config.cancellable[el['state']] = []
-                                config.cancellable[el['state']].append(dd)
-                                dd.addBoth(cleanState,
-                                           *(el['state'], 1))
-                log.msg('config state: %s' % config.state, loglevel='debug')
-                log.msg('maxtime = %s' % maxtime, loglevel='debug')
-                log.msg('cancellable list: %s' % config.cancellable,
-                        loglevel='debug')
-                ddd = task.deferLater(
-                    reactor, maxtime, func, *(args))
-                if maxtime > 0 and el['state'] is not None:
-                    config.cancellable[el['state']].append(ddd)
-                    ddd.addBoth(
-                        cleanState,
-                        *(el['state'], 1))
-                return ddd
+                            reactor.callLater(  # @UndefinedVariable
+                                float(i),
+                                fct,
+                                *(fargs))
+                else:
+                    for i in range(el['qty']):
+                        dd = task.deferLater(
+                            reactor,
+                            float(el['time']) + float(i),
+                            fct,
+                            *(fargs))
+                        if el['state'] not in\
+                                config.cancellable.keys():
+                            config.cancellable[el['state']] = []
+                        config.cancellable[el['state']].append(dd)
+                        dd.addBoth(cleanState,
+                                   *(el['state'], 1))
+        log.debug('config state: %s' % config.state)
+        log.debug('maxtime = %s' % maxtime)
+        log.debug('cancellable list: %s' % config.cancellable)
+        ddd = task.deferLater(
+            reactor, maxtime, func, *(args))
+        if maxtime > 0 and el['state'] is not None:
+            config.cancellable[el['state']].append(ddd)
+            ddd.addBoth(
+                cleanState,
+                *(el['state'], 1))
+        return ddd
     else:
         return func(*(args))
 
@@ -383,6 +431,7 @@ class XmlDictConfig(dict):
 
     And then use xmldict for what it is... a dict.
     '''
+
     def __init__(self, parent_element):
         if parent_element.items():
             self.update(dict(parent_element.items()))
@@ -446,7 +495,6 @@ class Timer(object):
             t = self._current
         else:
             t = time.time() - self._time
-#         log.err(t)
         return t
 
     def resume(self):

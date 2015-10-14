@@ -2,7 +2,7 @@
 '''
 Created on 4 févr. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import os
 import math
@@ -251,7 +251,7 @@ class Omxclient(Service):
                     self._duration = duration
                     self.upnp_duration = mpristime_to_upnptime(duration)
                 log.msg('track length: %s'
-                        % self.upnp_duration, loglevel='debug')
+                        % self.upnp_duration, loglevel=logging.DEBUG)
                 self.upnp_eventAV(self.upnp_duration,
                                   'CurrentTrackDuration')
                 self.oh_eventINFO(int(self._duration//1000000), 'duration')
@@ -391,7 +391,7 @@ class Omxclient(Service):
 
             def convert_volume(vol):
                 self._volume = int(float(vol))
-                log.msg("volume= %d" % self._volume, loglevel='debug')
+                log.msg("volume= %d" % self._volume, loglevel=logging.DEBUG)
                 return self._volume
 
             d = self.properties.Volume()
@@ -414,9 +414,9 @@ class Omxclient(Service):
                               {'Volume': float(int(volume)/100.00)})
 
     def set_track_URI(self, uri, md=''):
-        log.msg("set track uri : %s " % uri, loglevel='debug')
+        log.msg("set track uri : %s " % uri, loglevel=logging.DEBUG)
         try:
-            log.msg("current uri : %s " % self._track_URI, loglevel='debug')
+            log.msg("current uri : %s " % self._track_URI, loglevel=logging.DEBUG)
         except:
             pass
         if uri != self._track_URI:

@@ -2,7 +2,7 @@
 '''
 Created on 5 sept. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 from fractions import Fraction
 import os
@@ -95,7 +95,7 @@ class Mprisclient(Service):
                 + self.playercmd_args.split()
         for proc in psutil.process_iter():
             if proc.name() == self.player:
-                log.msg('Player process found', loglevel='debug')
+                log.msg('Player process found', loglevel=logging.DEBUG)
                 self._managed = False
                 self.extpid = proc.pid
                 self.juststarted = False
@@ -131,7 +131,7 @@ class Mprisclient(Service):
             self.connected = True
             self.launched = True
             log.msg("got dbus connection with player")
-            log.msg("player = %s" % name.encode('utf-8'), loglevel='debug')
+            log.msg("player = %s" % name.encode('utf-8'), loglevel=logging.DEBUG)
             self._errors = 0
             self.getStatus()
 
@@ -194,7 +194,7 @@ class Mprisclient(Service):
             self.stopping = False
 
     def disconnected(self, obj=None, reason=''):
-        log.msg('dbus disconnected, reason=%s' % reason, loglevel='debug')
+        log.msg('dbus disconnected, reason=%s' % reason, loglevel=logging.DEBUG)
         self.connected = False
         self.set_state('Stopped')
 
@@ -260,13 +260,13 @@ class Mprisclient(Service):
                                              self.changed_state)
         except:
             log.msg("dbus register signal not supported, polling...",
-                    loglevel='debug')
+                    loglevel=logging.DEBUG)
         else:
             self.notify = True
             self.mediaplayer.register_signal('NameLost',
                                              self.disconnected,
                                              interf='org.freedesktop.DBus')
-            log.msg("notify = OK", loglevel='debug')
+            log.msg("notify = OK", loglevel=logging.DEBUG)
         self.getStatus = self.getStatus_
         task.deferLater(reactor, 1, self.getStatus)
 
@@ -284,7 +284,7 @@ class Mprisclient(Service):
 
     def changed_state(self, dbus_interface, msg, lst, pending=False):
         log.msg('remote client %s changed state = %s %s' %
-                (dbus_interface, msg, lst), loglevel='debug')
+                (dbus_interface, msg, lst), loglevel=logging.DEBUG)
         if 'PlaybackStatus' in msg.keys():
             if len(msg['PlaybackStatus']) > 1:
                 self.set_state(msg['PlaybackStatus'])
@@ -298,7 +298,7 @@ class Mprisclient(Service):
                 + str(Fraction(float(self._rate)).
                       limit_denominator(1).denominator)
         if "Volume" in msg.keys():
-            log.msg('volume changed', loglevel='debug')
+            log.msg('volume changed', loglevel=logging.DEBUG)
             vol = int(float(msg["Volume"])*100)
             if vol != self._volume:
                 if vol != 0:
@@ -306,7 +306,7 @@ class Mprisclient(Service):
                     self._muted = False
                 else:
                     self._muted = True
-                log.msg('send volume', loglevel='debug')
+                log.msg('send volume', loglevel=logging.DEBUG)
                 self.upnp_eventRCS(self._volume, 'Volume')
                 self.oh_eventVOLUME(self._volume, 'volume')
         if 'Metadata' in msg.keys():
@@ -421,7 +421,7 @@ class Mprisclient(Service):
                     self._duration = duration
                     self._track_duration = mpristime_to_upnptime(duration)
                 log.msg('track length: %s'
-                        % self._track_duration, loglevel='debug')
+                        % self._track_duration, loglevel=logging.DEBUG)
                 self.upnp_eventAV(self._track_duration,
                                   'CurrentTrackDuration')
                 self.oh_eventINFO(int(self._duration//1000000), 'duration')
@@ -449,12 +449,12 @@ class Mprisclient(Service):
                 self._track_URI = metadata['url']
 
     def set_state(self, state):
-        log.msg("SET NEW STATE : %s " % state, loglevel='debug')
+        log.msg("SET NEW STATE : %s " % state, loglevel=logging.DEBUG)
         if state in ['Stop', 'Play', 'Pause']:
             return
         if state == self._state:
             return
-        log.msg('send new state: %s' % state, loglevel='debug')
+        log.msg('send new state: %s' % state, loglevel=logging.DEBUG)
         if state == 'Ended':
             self.has_tracklist = False
             self.idArray = ''
@@ -642,7 +642,7 @@ class Mprisclient(Service):
 #             if self.launch_player(True):
 #                 log.msg('Player is already launched,
 #                     status = %s , try again' % self._state,
-#                     loglevel='debug')
+#                     loglevel=logging.DEBUG)
 #                 reactor.callLater(1, self.get_reltime)#@UndefinedVariable
         if fmt == 'UPNP':
             return self.reltime
@@ -662,7 +662,7 @@ class Mprisclient(Service):
 
             def convert_volume(vol):
                 self._volume = int(float(vol)*100)
-                log.msg("volume= %d" % self._volume, loglevel='debug')
+                log.msg("volume= %d" % self._volume, loglevel=logging.DEBUG)
                 return self._volume
 
             d = self.mediaplayer.get("Volume",
@@ -705,9 +705,9 @@ class Mprisclient(Service):
                 return self.set_volume(channel, volume)
 
     def set_track_URI(self, uri, md=''):
-        log.msg("set track uri : %s " % uri, loglevel='debug')
+        log.msg("set track uri : %s " % uri, loglevel=logging.DEBUG)
         try:
-            log.msg("current uri : %s " % self._track_URI, loglevel='debug')
+            log.msg("current uri : %s " % self._track_URI, loglevel=logging.DEBUG)
         except:
             pass
         if uri != self._track_URI:

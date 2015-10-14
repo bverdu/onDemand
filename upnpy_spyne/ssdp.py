@@ -1,9 +1,10 @@
 '''
 Created on 6 sept. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import time
+import logging
 import socket
 from random import Random
 from twisted.internet import task, reactor
@@ -23,15 +24,15 @@ class SSDPServer(service.MultiService):  # @UndefinedVariable
     '''
     Main class to manage SSDP
     '''
-    __slots__ = ['name',
-                 'services',
-                 'device',
-                 'targets',
-                 'listener',
-                 'ssdp',
-                 'client',
-                 'ssdp_client',
-                 '__dict__']
+#     __slots__ = ['name',
+#                  'services',
+#                  'device',
+#                  'targets',
+#                  'listener',
+#                  'ssdp',
+#                  'client',
+#                  'ssdp_client',
+#                  '__dict__']
     name = "SSDPServer"
     targets = ['ssdp:all', 'upnp:rootdevice', ]
     listener = None
@@ -65,7 +66,7 @@ class SSDPServer(service.MultiService):  # @UndefinedVariable
         '''
         '''
 #         self.signal("started")
-        log.msg('SSDP Service started', loglevel='info')
+        log.msg('SSDP Service started', loglevel=logging.INFO)
 
     def stopService(self):
         self.client.sendall_NOTIFY(None, 'ssdp:byebye', True)
@@ -247,7 +248,7 @@ class SSDP_Listener(DatagramProtocol):
         elif method == 'NOTIFY':
             self.received_NOTIFY(headers, (address, port))
         else:
-            log.msg("Unhandled Method '%s'" % method, loglevel='debug')
+            log.msg("Unhandled Method '%s'" % method, loglevel=logging.DEBUG)
 
     def received_MSEARCH(self, headers, (address, port)):
         #  log.msg("received_MSEARCH: %s" % headers)
@@ -258,16 +259,18 @@ class SSDP_Listener(DatagramProtocol):
             st = headers['st']
 #             log.msg('man = %s, mx = %s, st= %s \n' % (man, mx, st))
         except KeyError:
-            log.msg("Received message with missing headers", loglevel='debug')
+            log.msg("Received message with missing headers",
+                    loglevel=logging.DEBUG)
             return
         except ValueError:
-            log.msg("Received message with invalid values", loglevel='debug')
+            log.msg("Received message with invalid values",
+                    loglevel=logging.DEBUG)
             return
 
         if man != 'ssdp:discover':
             log.msg(
                 "Received message where MAN != 'ssdp:discover'",
-                loglevel='debug')
+                loglevel=logging.DEBUG)
             return
         if st == 'ssdp:all':
             for target in self.ssdp.targets:

@@ -3,7 +3,7 @@
 '''
 Created on 4 févr. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import os
 import psutil

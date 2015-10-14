@@ -1,7 +1,7 @@
 '''
 Created on 17 avr. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import uuid
 import socket
@@ -15,15 +15,14 @@ from upnpy_spyne.services.ohvolume import Volume
 
 class Source(Device):
 
-    def __init__(self, name, player, datadir):
-        Device.__init__(self)
+    def __init__(self, path, player, datadir):
+        Device.__init__(self, path)
         self._description = None
         self.datadir = datadir
         self.player = player
         self.player.parent = self
         self.type = 'Source'
         self.deviceType = 'urn:linn-co-uk:device:Source:1'
-        self.friendlyName = name
         self.manufacturer = "upnpy"
         self.manufacturerURL = "http://github.com/bverdu/upnpy"
         self.manufacturerInfo = "coucou, c'est nous"
@@ -32,14 +31,16 @@ class Source(Device):
         self.modelName = "Snap_Media (OpenHome)"
         self.version = (1, 0,)
         self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname()+name))
-        self.playlist = Playlist(datadir + 'xml/playlist.xml', self.player, name=name)
+            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
+        self.playlist = Playlist(
+            datadir + 'xml/playlist.xml', self.player, name=self.name)
         self.sources = [self.playlist]
         self.product = Product(
-            datadir + 'xml/product.xml', self.player, name=name)
-        self.info = Info(datadir + 'xml/info.xml', self.player, name=name)
-        self.time = Time(datadir + 'xml/time.xml', self.player, name=name)
-        self.volume = Volume(datadir + 'xml/volume.xml', self.player, name=name)
+            datadir + 'xml/product.xml', self.player, name=self.name)
+        self.info = Info(datadir + 'xml/info.xml', self.player, name=self.name)
+        self.time = Time(datadir + 'xml/time.xml', self.player, name=self.name)
+        self.volume = Volume(
+            datadir + 'xml/volume.xml', self.player, name=self.name)
         self.services = [
             self.product,
             self.playlist,
@@ -55,4 +56,3 @@ class Source(Device):
 
     def sendIR(self):
         raise NotImplementedError()
-

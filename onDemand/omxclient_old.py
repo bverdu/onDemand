@@ -1,7 +1,7 @@
 '''
 Created on 22 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import psutil
 import os
@@ -72,7 +72,7 @@ class OmxPlayer(Service):
                 + self.playercmd_args.split()
         for proc in psutil.process_iter():
             if proc.name() == self.player:
-                log.msg('Player process found', loglevel='debug')
+                log.msg('Player process found', loglevel=logging.DEBUG)
                 self._managed = False
                 self.extpid = proc.pid
                 self.juststarted = False
@@ -109,7 +109,7 @@ class OmxPlayer(Service):
             self.connected = True
             self.launched = True
             log.msg("got dbus connection with player")
-            log.msg("player = %s" % name.encode('utf8'), loglevel='debug')
+            log.msg("player = %s" % name.encode('utf8'), loglevel=logging.DEBUG)
             self._errors = 0
             self.getStatus(True)
 
@@ -130,7 +130,7 @@ class OmxPlayer(Service):
         return d
 
     def disconnect(self, obj=None, reason=''):
-        log.msg('dbus disconnected, reason=%s' % reason, loglevel='debug')
+        log.msg('dbus disconnected, reason=%s' % reason, loglevel=logging.DEBUG)
         self.set_state('STOPPED')
 
     def connectionLost(self, reason):
@@ -147,7 +147,7 @@ class OmxPlayer(Service):
                                                  self.changed_state)
             except:
                 log.msg("dbus register signal not supported, polling...",
-                        loglevel='debug')
+                        loglevel=logging.DEBUG)
                 task.deferLater(reactor, 1, self.getStatus, False)
 #                 self.getStatus(False)
             else:
@@ -155,7 +155,7 @@ class OmxPlayer(Service):
                 self.mediaplayer.register_signal('NameLost',
                                                  self.disconnect,
                                                  interf='org.freedesktop.DBus')
-                log.msg("notify = OK", loglevel='debug')
+                log.msg("notify = OK", loglevel=logging.DEBUG)
                 task.deferLater(reactor, 1, self.getStatus, False)
 #                 self.getStatus(False)
         else:
@@ -223,13 +223,13 @@ class OmxPlayer(Service):
 
     def changed_state(self, dbus_interface, msg, lst, pending=False):
         if pending:
-            log.msg('pending', loglevel='debug')
+            log.msg('pending', loglevel=logging.DEBUG)
             if not self._event:
-                log.msg('cancelled', loglevel='debug')
+                log.msg('cancelled', loglevel=logging.DEBUG)
                 return defer.succeed(None)
         self._event = False
         log.msg('remote client %s changed state = %s' %
-                (dbus_interface, msg), loglevel='debug')
+                (dbus_interface, msg), loglevel=logging.DEBUG)
         if 'PlaybackStatus' in msg.keys():
             if len(msg['PlaybackStatus']) > 1:
                 self.set_state(msg['PlaybackStatus'])
@@ -243,7 +243,7 @@ class OmxPlayer(Service):
                 + str(Fraction(float(rate)).
                       limit_denominator(1).denominator)
         if "Volume" in msg.keys():
-            log.msg('volume changed', loglevel='debug')
+            log.msg('volume changed', loglevel=logging.DEBUG)
             vol = int(float(msg["Volume"])*100)
             if vol != self._volume:
                 if vol != 0:
@@ -251,7 +251,7 @@ class OmxPlayer(Service):
                     self._muted = False
                 else:
                     self._muted = True
-                log.msg('send volume', loglevel='debug')
+                log.msg('send volume', loglevel=logging.DEBUG)
                 self.upnp_eventRCS(
                     {'evtype': 'last_change',
                      'data':
@@ -277,7 +277,7 @@ class OmxPlayer(Service):
                     else:
                         self._track_duration = mpristime_to_upnptime(ln)
                     log.msg('track length: %s'
-                            % self._track_duration, loglevel='debug')
+                            % self._track_duration, loglevel=logging.DEBUG)
             if 'xesam:url' in metadata.keys():
                     self._track_URI = metadata['xesam:url']
                     self.metadata_str = didl_encode(self.metadata)
@@ -291,7 +291,7 @@ class OmxPlayer(Service):
                 self._track_URI = metadata['url']
 
     def set_state(self, state):
-        log.msg("SET NEW STATE : %s " % state, loglevel='debug')
+        log.msg("SET NEW STATE : %s " % state, loglevel=logging.DEBUG)
         if state in ['Stop', 'Play', 'Pause']:
             return defer.succeed(None)
         if state == "Paused":
@@ -300,7 +300,7 @@ class OmxPlayer(Service):
             self.cancelplay = False
         if state.upper() != self._state:
             self._state = str(state.upper())
-            log.msg('send new state: %s' % self._state, loglevel='debug')
+            log.msg('send new state: %s' % self._state, loglevel=logging.DEBUG)
             self.prepare_event('upnp_eventAV')
             self.upnp_eventAV(
                 {'evtype': 'last_change',
@@ -402,7 +402,7 @@ class OmxPlayer(Service):
 #             if self.launch_player(True):
 #                 log.msg('Player is already launched,
 #                     status = %s , try again' % self._state,
-#                     loglevel='debug')
+#                     loglevel=logging.DEBUG)
 #                 reactor.callLater(1, self.get_reltime)#@UndefinedVariable
         return self.reltime
 
@@ -465,7 +465,7 @@ class OmxPlayer(Service):
                 d = self.protocol.shutdown()
                 d.addCallback(self.play)
         else:
-            log.msg('launching player', loglevel='debug')
+            log.msg('launching player', loglevel=logging.DEBUG)
             reactor.spawnProcess(  # @UndefinedVariable
                 PlayerProcess(self),
                 self.player_path,
@@ -474,7 +474,7 @@ class OmxPlayer(Service):
             self._managed = True
 
     def playing(self, *ret):
-            log.msg('playing...', loglevel='debug')
+            log.msg('playing...', loglevel=logging.DEBUG)
             self.set_state('PLAYING')
 
     def playpause(self):
@@ -508,7 +508,7 @@ class OmxPlayer(Service):
 
             def convert_volume(vol):
                 self._volume = int(float(vol)*100)
-                log.msg("volume= %d" % self._volume, loglevel='debug')
+                log.msg("volume= %d" % self._volume, loglevel=logging.DEBUG)
                 return self._volume
 
             d = self.mediaplayer.get("Volume",
@@ -574,9 +574,9 @@ class OmxPlayer(Service):
             return self.set_volume('Master', 0)
 
     def set_track_URI(self, uri, md=''):
-        log.msg("set track uri : %s " % uri, loglevel='debug')
+        log.msg("set track uri : %s " % uri, loglevel=logging.DEBUG)
         try:
-            log.msg("current uri : %s " % self._track_URI, loglevel='debug')
+            log.msg("current uri : %s " % self._track_URI, loglevel=logging.DEBUG)
         except:
             pass
         if uri != self._track_URI:

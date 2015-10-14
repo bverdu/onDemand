@@ -21,10 +21,12 @@ from cStringIO import StringIO
 from lxml import etree as et
 # from upnpy.lict import Lict
 # from collections import OrderedDict
-from twisted.python import log
+from twisted.logger import Logger
 from twisted.internet import reactor
 from twisted.web.client import Agent, FileBodyProducer
 from twisted.web.http_headers import Headers
+from twisted.words.protocols.jabber.client import IQ
+from twisted.words.xish import domish
 
 
 # from upnpy.utils import make_element
@@ -40,6 +42,7 @@ class EventProperty(object):
                  '__dict__']
 
     def __init__(self, name, initial=None, ns=None):
+        self.log = Logger
         self.name = name
         self.value = initial
         self.namespace = ns
@@ -49,7 +52,7 @@ class EventProperty(object):
         self.initialized = False
 
     def _instance_initialize(self, instance):
-#         log.err(instance.stateVariables)
+        #  log.err(instance.stateVariables)
         if not hasattr(instance, 'stateVariables'):
             raise TypeError()
 
@@ -85,12 +88,10 @@ class EventProperty(object):
             return 0
         if self.state_variable.dataType == 'bin.base64':
             return ''
-        log.err(
+        self.log.error(
             '******************%s ------------------%s'
             % (self.state_variable.name, self.state_variable.dataType))
-        log.msg(
-            self.state_variable.dataType + "not implemented",
-            loglevel='debug')
+        self.log.debug(self.state_variable.dataType + "not implemented")
 #         raise NotImplementedError()
 
     def __get__(self, instance, owner):
@@ -101,9 +102,9 @@ class EventProperty(object):
         return self.value
 
     def __set__(self, instance, value, ns=None):
-#         log.msg('set!')
-#         if hasattr(instance, 'parent'):
-#             log.err('SET %s ----> %s' % (instance.parent.friendlyName, value))
+        # log.msg('set!')
+        # if hasattr(instance, 'parent'):
+        # log.err('SET %s ----> %s' % (instance.parent.friendlyName, value))
         if not self.initialized:
             self._instance_initialize(instance)
         if value is not None:
@@ -139,6 +140,7 @@ class EventSubscription(object):
                  '__dict__']
 
     def __init__(self, sid, callback, timeout):
+        self.log = Logger()
         self.sid = sid
         self.callback_addr = callback
         self.timeout = timeout
@@ -180,7 +182,7 @@ class EventSubscription(object):
         for prop in self.pending_events.values():
             if prop.namespace is not None:
                 et.register_namespace('e', prop.namespace)
-            _property = et.SubElement(_propertyset, PREFIX+'property')
+            _property = et.SubElement(_propertyset, PREFIX + 'property')
 #             log.msg('Child xml = %s' % prop.value)
 #             _property.append(make_element(prop.name, str(prop.value)))
             try:
@@ -212,13 +214,12 @@ class EventSubscription(object):
 #                     evt.append(ev)
                     evt.text = et.tostring(ev)
                 else:
-#                     log.err('%s - %s' % (prop.name, prop.value))
+                    #  log.err('%s - %s' % (prop.name, prop.value))
                     evt.text = str(prop.value).decode('utf-8')
                 _property.append(evt)
             except:
-                log.msg(
-                    'Malformed XML Event: %s' %
-                    dir(prop), loglevel='debug')
+                self.log.debug(
+                    'Malformed XML Event: %s' % dir(prop))
                 return
             _propertyset.append(_property)
         headers = {
@@ -227,19 +228,18 @@ class EventSubscription(object):
             'SID': [self.sid],
             'SEQ': [str(self.next_notify_key)],
             'Content-Type': ['text/xml']
-            }
+        }
         data = StringIO(''.join(('<?xml version="1.0" ',
-                                'encoding="utf-8" ',
+                                 'encoding="utf-8" ',
                                  'standalone="yes"?>',
                                  et.tostring(_propertyset))))
 #         log.err("Event TCP Frame Data: %s" % data)
         body = FileBodyProducer(data)
 
         def notify_failed(err):
-            log.msg(
+            self.log.debug(
                 'Notify failed: %s --- %s'
-                % (err.type, err.getErrorMessage()),
-                loglevel='info')
+                % (err.type, err.getErrorMessage()))
             self.expired = True
 #         log.err(self.callback_addr)
         d = self.agent.request(
@@ -262,7 +262,7 @@ class EventSubscription(object):
         if self.expired:
             return
         if self.check_expiration():
-            log.msg("(%s) subscription expired" % self.sid, loglevel='debug')
+            self.log.debug("(%s) subscription expired" % self.sid)
             return
         if isinstance(self.callback_addr, str):
             if prop.name == 'LastChange':
@@ -278,3 +278,77 @@ class EventSubscription(object):
                                   self.send_notify)
         else:
             self.callback_addr.publish((prop.name, prop,))
+
+
+class XmppEvent(object):
+
+    def __init__(self, nodeId, parent, pubsub_addr):
+        self.log = Logger()
+        self.nodeId = nodeId
+        self.parent = parent
+        self.addr = pubsub_addr
+
+    def publish(self, event):
+
+        if len(self.parent.active_controllers) == 0:
+            #             self.log.debug('event cancelled')
+            self.parent.registrations = []
+            return
+
+        def success(res):
+            #             print('event sent')
+            if res['type'] == 'error':
+                self.log.error('Publish Event failed :%s' % res.toXml())
+            else:
+                if 'Id' in res.children[0].children[0]['node']:
+                    self.log.debug('Event Published: %s' % res.toXml())
+        name, data = event
+        if name == 'Seconds':
+            return
+        iq = IQ(self.parent.xmlstream, 'set')
+        ps = domish.Element(('http://jabber.org/protocol/pubsub', 'pubsub'))
+        publish = domish.Element((None, 'publish'))
+        publish['node'] = '/'.join((self.nodeId, name))
+        item = domish.Element((None, 'item'))
+        propertyset = domish.Element(
+            ('urn:schemas-upnp-org:event-1-0', 'propertyset'),
+            localPrefixes={'e': 'urn:schemas-upnp-org:event-1-0'})
+        prop = domish.Element((None, 'e:property'))
+        evt = domish.Element((None, name))
+        if isinstance(data.value, dict):
+            ev = domish.Element((data.namespace, 'Event'))
+            inst = domish.Element((None, 'InstanceID'))
+            inst['val'] = '0'
+            for k, v in data.value.items:
+                if 'namespace' in v:
+                    var = domish.Element((v['namespace'], k))
+                else:
+                    var = domish.Element((None, k))
+                if 'attrib' in v:
+                    attr = v['attrib']
+                else:
+                    attr = {}
+                value = v['value']
+                if isinstance(value, bool):
+                    value = int(value)
+                attr.update(
+                    {'val': str(value)
+                     .decode('utf-8')})
+                for attname, attval in attr:
+                    var[attname] = attval
+                inst.addChild(var)
+            ev.addChild(inst)
+            evt.addChild(ev)
+        else:
+            #             print(str(data.value).decode('utf-8'))
+            if isinstance(data.value, bool):
+                data.value = int(data.value)
+            evt.addContent(str(data.value).decode('utf-8'))
+        prop.addChild(evt)
+        propertyset.addChild(prop)
+        item.addChild(propertyset)
+        publish.addChild(item)
+        ps.addChild(publish)
+        iq.addChild(ps)
+        iq.addCallback(success)
+        iq.send(to=self.addr)

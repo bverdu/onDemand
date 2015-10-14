@@ -1,7 +1,7 @@
 '''
 Created on 8 nov. 2014
 
-@author: babe
+@author: Bertrand Verdu
 '''
 from twisted.python import log
 from twisted.protocols.basic import LineReceiver
@@ -47,9 +47,9 @@ class LircdProtocol(LineReceiver):
                 self.__current = name + remote
                 call['fct']()
             elif called != self.__current:
-                    self.__term = t + self.__repeat_delay
-                    self.__current = name + remote
-                    call['fct']()
+                self.__term = t + self.__repeat_delay
+                self.__current = name + remote
+                call['fct']()
             elif t > self.__term:
                 self.__term = t + self.__repeat_delay
                 call['fct']()
@@ -59,6 +59,7 @@ class LircdProtocol(LineReceiver):
 
 
 class LircdFactory(ReconnectingClientFactory):
+
     def __init__(self, delay, simul=False):
         self.simul = simul
         self.proto = LircdProtocol(delay)
@@ -71,14 +72,14 @@ class LircdFactory(ReconnectingClientFactory):
 
     def send(self, command, transmitter, simul=False):
         def simulate(d):
-            log.msg('IRsend: %s %s ' % (transmitter, command), loglevel='info')
+            log.msg('IRsend: %s %s ' % (transmitter, command))
             d.callback(None)
         if self.simul or simul:
             d = defer.Deferred()
             reactor.callLater(0.1, simulate, d)  # @UndefinedVariable
             return d
         else:
-            log.msg('IRsend:%s %s ' % (transmitter, command), loglevel='info')
+            log.msg('IRsend:%s %s ' % (transmitter, command))
             # double the ir signal for safety
             reactor.callLater(  # @UndefinedVariable
                 0.1,
@@ -90,7 +91,7 @@ if __name__ == '__main__':
     def print_code(name=''):
         print('intercepted: %s' % name)
     lircd = LircdFactory(0.5)
-    lircd.addCallback('KEY_RIGHT'+'devinput', print_code)
+    lircd.addCallback('KEY_RIGHT' + 'devinput', print_code)
     reactor.connectUNIX("/var/run/lirc/lircd", lircd)  # @UndefinedVariable
     lircemitter = LircdFactory(0.5)
     reactor.connectUNIX(  # @UndefinedVariable

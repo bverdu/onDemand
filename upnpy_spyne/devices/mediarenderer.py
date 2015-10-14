@@ -1,7 +1,7 @@
 '''
 Created on 10 mai 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import uuid
 import socket
@@ -12,15 +12,14 @@ from upnpy_spyne.services import Service, get_event_catcher
 
 class MediaRenderer(Device):
 
-    def __init__(self, name, player, datadir):
-        Device.__init__(self)
+    def __init__(self, path, player, datadir):
+        Device.__init__(self, path)
         self._description = None
         self.datadir = datadir
         self.player = player
         self.player.parent = self
         self.type = 'MediaRenderer'
         self.deviceType = 'urn:schemas-upnp-org:device:MediaRenderer:1'
-        self.friendlyName = name
         self.manufacturer = "upnpy"
         self.manufacturerURL = "http://github.com/bverdu/upnpy"
         self.manufacturerInfo = "coucou, c'est nous"
@@ -29,21 +28,21 @@ class MediaRenderer(Device):
         self.modelName = "Snap_Media"
         self.version = (1, 0,)
         self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname()+name))
+            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
         self.avtransport = AVTransport(
             datadir + 'xml/AVTransport1.xml', self.player)
         self.conmanager = Service(
             'Connection Manager',
             'urn:schemas-upnp-org:service:ConnectionManager:1',
             client=self.player,
-            xml=datadir+'xml/ConnectionManager1.xml')
+            xml=datadir + 'xml/ConnectionManager1.xml')
         self.conmanager.upnp_event = get_event_catcher(self.conmanager)
         self.player.upnp_eventCM = self.conmanager.upnp_event
         self.rcontrol = Service(
             'Rendering Control',
             'urn:schemas-upnp-org:service:RenderingControl:1',
             client=self.player,
-            xml=datadir+'xml/RenderingControl1.xml')
+            xml=datadir + 'xml/RenderingControl1.xml')
         self.rcontrol.upnp_event = get_event_catcher(self.rcontrol)
         self.player.upnp_eventRCS = self.rcontrol.upnp_event
         self.services = [

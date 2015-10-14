@@ -1,0 +1,103 @@
+#:kivy 1.9.0
+#:import Factory kivy.factory.Factory     
+<Weather>:
+    weather: self.weather
+    description: self.description
+    temp: self.temp
+    wind: self.wind
+    humidity: self.humidity
+    icon: self.icon
+    background_normal: ''
+    background_color: 0,0,0,.4
+    on_release:
+        root.parent.show_forecast()
+    BoxLayout:
+        orientation: 'horizontal'
+        pos: self.parent.pos
+        size: self.parent.size
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint: .3, 1
+            Image:
+                id: icon
+                y: self.parent.y - 10
+                x: self.parent.x
+                size_hint: 1, .8
+                source: root.icon
+            Label:
+                size_hint: 1, .2
+                markup: True
+                text: "[b][size=18]" + root.weather + "[/size][/b]"
+        BoxLayout:
+            size_hint: .7, 1
+            orientation: 'vertical'
+            Label:
+                size_hint_y: .4
+                text: 'Température: ' + root.temp
+            Label:
+                size_hint_y: .3
+                text: 'Vitesse du vent: ' + root.wind
+            Label:
+                size_hint_y: .3
+                text: 'Taux d\'humidité: ' + root.humidity
+
+<Forecast>:
+    background_normal: ''
+    background_color: 0,0,0,.4
+    BoxLayout:
+        orientation: 'horizontal'
+        pos: self.parent.pos
+        size: self.parent.size
+        id: forecast_box
+        Button:
+            size_hint: .1, 1
+            background_normal: ''
+            background_color: 0,0,0,.5
+            on_release:
+                root.parent.show_weather()
+            Image:
+                size: self.parent.size
+                source: 'atlas://data/images/defaulttheme/previous_normal'
+            
+          
+        
+<ForecastDay>:
+    background_normal: ''
+    background_color: 0,0,0,.5
+    title: self.title
+    icon: self.icon
+    temp: self.temp
+    txt: self.txt
+    txt_size: 16
+    size_hint: .26, 1
+    on_release:
+        self.switch()
+    BoxLayout:
+        orientation: 'vertical'
+        pos: root.pos
+        Label:
+            size_hint: 1, .1
+            text_size: self.parent.width, None
+            size: self.texture_size
+            halign: 'center'
+            valign: 'middle'
+            text: root.title
+        BoxLayout:
+            size_hint: 1, .5
+            orientation: 'horizontal'
+            Image:
+                source: root.icon
+            Label:
+                size_hint: .5, 1
+                markup: True
+                text: '[b][size=20]' + root.temp + '[/size][/b]'
+        Label:
+            #pos: root.pos
+            size_hint: 1, .4
+            text_size: self.parent.width, None
+            size: self.texture_size
+            markup: True
+            halign: 'center'
+            valign: 'middle'
+            text: root.txt
+            

@@ -1,8 +1,9 @@
 '''
 Created on 22 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
+import logging
 from twisted.python import log
 from upnpy.services import register_action
 from templates.connection_manager import ConnectionManagerService
@@ -19,7 +20,7 @@ class ConnectionManager(ConnectionManagerService):
 
     @register_action('GetProtocolInfo')
     def getProtocolInfo(self):
-        log.err('GetProtocolInfo from ConnectionManager', loglevel='debug')
+        log.err('GetProtocolInfo from ConnectionManager', loglevel=logging.DEBUG)
         log.err(self.parent.player.mtlist)
         return {
             'Source': self.source_protocol_info_value,

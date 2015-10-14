@@ -2,7 +2,7 @@
 '''
 Created on 17 mars 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import sys
 from spyne.client import Service

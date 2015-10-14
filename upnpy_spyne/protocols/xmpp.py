@@ -1,7 +1,7 @@
 '''
 Created on 8 juin 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import sys
 

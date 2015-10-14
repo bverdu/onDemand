@@ -1,7 +1,7 @@
 '''
 Created on 8 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 
 from spyne.decorator import rpc

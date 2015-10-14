@@ -1,7 +1,7 @@
 '''
 Created on 22 janv. 2015
 
-@author: babe
+@author: Bertrand Verdu
 '''
 import uuid
 import socket
