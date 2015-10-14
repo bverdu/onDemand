@@ -1,3 +1,4 @@
+# encoding: utf-8
 '''
 Created on 18 fev. 2015
 
@@ -848,9 +849,9 @@ class GetDevices(amp.Command):
 
 class DeviceInfo(amp.Command):
     arguments = [('uuid', amp.String())]
-    response = [('name', amp.Unicode()),
-                ('type', amp.String()),
-                ('services', amp.ListOf(amp.String()))]
+    response = [('name', amp.String()),
+                ('id_', amp.String()),
+                ('value', amp.ListOf(amp.Unicode()))]
 
 
 class StartController(amp.Command):
@@ -907,12 +908,20 @@ class ControllerAmp(amp.AMP):
 
     @DeviceInfo.responder
     def device_info(self, uuid):
+        print('dev info 2')
         if not self.parent.controller:
             return
+        print('dev info 3')
         dev = self.parent.controller.devices[uuid]
+        print('dev info 4')
+        l = []
+        for k, v in dev.iteritems():
+            if not v or isinstance(v, dict):
+                continue
+            l.append(':'.join((k, v)))
         return {'name': dev['name'],
-                'type': dev['devType'],
-                'services': [s for s in dev['services'].keys()]}
+                'id_': uuid,
+                'value': l}
 
     @StartController.responder
     def start_controller(self, search_type, search_name, network,
@@ -932,9 +941,7 @@ class ControllerAmp(amp.AMP):
             self.parent.controller = Controller(
                 searchables=[(search_type, search_name)], network=network,
                 cloud_user=(cloud_user, cloud_pass), messager=self)
-            print('1')
             self.parent.controller.startService()
-            print('2')
             return {'started': True}
         except Exception as err:
             print(err)

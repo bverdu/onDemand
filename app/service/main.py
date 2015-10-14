@@ -38,8 +38,20 @@ class ServiceFactory(Factory):
     def __init__(self):
         self.controller = None
         self.protocol.parent = self
+        self.wait = 0
+
+    def notified(self):
+        self.wait -= 1
 
     def notify(self, title, message):
+        if self.wait > 0:
+            reactor.callLater(self.wait + 1,  # @UndefinedVariable
+                              self.notify,
+                              *(title, message))
+            return
+        else:
+            self.wait += 1
+            reactor.callLater(1, self.notified)  # @UndefinedVariable
         if platform == 'win':
             icon = 'logo.ico'
             timeout = 10

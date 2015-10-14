@@ -24,7 +24,7 @@ from twisted.internet import reactor  # @IgnorePep8
 from twisted.internet.protocol import Factory  # @IgnorePep8
 from twisted.internet.endpoints import TCP4ClientEndpoint  # @IgnorePep8
 # @IgnorePep8
-from upnpy_spyne.controller import StartController, GetDevices, Event
+from upnpy_spyne.controller import StartController, GetDevices, Event, DeviceInfo
 
 kivy.require('1.9.0')
 __version__ = '0.1'
@@ -91,25 +91,33 @@ class Main(BoxLayout):
     def on_location(self, inst, value):
         print('***********New Location***********%s' % value)
 
-    def on_device(self, uid, data):
-        val = data.split(':')
-        v = ':'.join(val[1:])
-        print('new device : %s, %s=%s' % (uid, val[0], v))
-        if uid in self.devices:
-            self.devices[uid].update({val[0]: v})
-        else:
-            self.devices.update({uid: {val[0]: v}})
-        if val[0] == 'devtype':
+    def on_device(self, res, uid):
+        if isinstance(res, dict):
+            res = res['value']
+        if not isinstance(res, list):
+            res = [res]
+        for data in res:
+            val = data.split(':')
             v = ':'.join(val[1:])
-            for item in ('Source', 'BinaryLight',
-                         'HVAC_System', 'HVAC_ZoneThermostat',
-                         'MediaRenderer', 'SensorManagement'):
-                if item in v:
-                    self.devices[uid].update({'ignored': False})
-                else:
-                    self.devices[uid].update({'ignored': True})
-        if val[0] == 'loc':
-            print('youpiii!')
+            print('new device : %s, %s=%s' % (uid, val[0], v))
+            if uid in self.devices:
+                self.devices[uid].update({val[0]: v})
+            else:
+                self.devices.update({uid: {val[0]: v}})
+            if val[0] == 'devtype':
+                v = ':'.join(val[1:])
+                for item in ('Source', 'BinaryLight',
+                             'HVAC_System', 'HVAC_ZoneThermostat',
+                             'MediaRenderer', 'SensorManagement'):
+                    if item in v:
+                        self.devices[uid].update({'ignored': False})
+                    else:
+                        self.devices[uid].update({'ignored': True})
+            if val[0] == 'loc':
+                country, city, name, room = v.split('/')
+                if name not in self._locations:
+                    self._locations.update({name: '/'.join((country, city))})
+                    self.locations.append(name)
 
     def connect(self):
         print('1')
@@ -131,7 +139,6 @@ class Main(BoxLayout):
     def connected(self, protocol, ignored=None):
         self.failconnect = 0
         self.controller_service = protocol
-        print('connected?')
         jid = '@'.join((bytes(self.config.getdefault(
             'Connection Settings', 'cloud_user', 'user')),
             bytes(self.config.getdefault(
@@ -153,13 +160,22 @@ class Main(BoxLayout):
 
     def show(self, res):
         print(res)
+        return res
+
+    def check_devices(self, devices):
+        for device in devices['devices']:
+            if device not in self.devices:
+                print('check 1')
+                d = self.controller_service.callRemote(DeviceInfo, uuid=device)
+                d.addCallback(self.on_device, device)
 
     def started(self, started):
-        print(started['started'])
+        #         print(started['started'])
         if started:
             d = self.controller_service.callRemote(GetDevices,
                                                    dev_type='')
             d.addCallback(self.show)
+            d.addCallback(self.check_devices)
 
     def change_orientation(self):
 
@@ -243,7 +259,7 @@ class ClientFactory(Factory):
 
     def receive(self, name, id_, value):
         if name in self.events_callers:
-            self.events_callers[name](id_, value)
+            self.events_callers[name](value, id_)
 
     def call(self, *args, **kwargs):
         self.protocol.callRemote(*args, **kwargs)
