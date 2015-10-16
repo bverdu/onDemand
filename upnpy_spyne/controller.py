@@ -7,10 +7,10 @@ Created on 18 fev. 2015
 import sys
 import socket
 import uuid
+import json
 from urlparse import urlparse
 from lxml import etree as et
 from twisted.application import service, internet
-from twisted.internet.protocol import Factory
 from twisted.protocols import amp
 from twisted.logger import Logger
 from twisted.internet import reactor, task, endpoints, defer, threads
@@ -394,15 +394,20 @@ class Controller(service.MultiService):
     def send_message(self, message_type, name, id_, value):
         if self.messager:
             if isinstance(value, dict):
-                for k, v in value.iteritems():
-                    if not v or isinstance(v, dict):
-                        print('zap')
-                        continue
-                    print(v)
-                    self.messager.callRemote(message_type,
+                self.messager.callRemote(message_type,
                                              name=name,
                                              id_=id_,
-                                             value=':'.join((k, v)))
+                                             value=json.dumps(value))
+                
+#                 for v in value.iteritems():
+#                     if not v or isinstance(v, dict):
+#                         print('zap')
+#                         continue
+#                     print(v)
+#                     self.messager.callRemote(message_type,
+#                                              name=name,
+#                                              id_=id_,
+#                                              value=':'.join((k, v)))
             else:
                 self.messager.callRemote(message_type,
                                          name=name,
@@ -844,14 +849,14 @@ class Call(amp.Command):
 
 class GetDevices(amp.Command):
     arguments = [('dev_type', amp.String())]
-    response = [('devices', amp.ListOf(amp.String()))]
+    response = [('devices', amp.ListOf(amp.Unicode()))]
 
 
 class DeviceInfo(amp.Command):
     arguments = [('uuid', amp.String())]
     response = [('name', amp.String()),
                 ('id_', amp.String()),
-                ('value', amp.ListOf(amp.Unicode()))]
+                ('value', amp.Unicode())]
 
 
 class StartController(amp.Command):
@@ -873,9 +878,7 @@ class Event(amp.Command):
 class ControllerAmp(amp.AMP):
 
     def __init__(self):
-        print('controllerAmp')
         amp.AMP.__init__(self)
-        print('oooo')
 
     def format_result(self, result):
         print(result)
@@ -901,9 +904,9 @@ class ControllerAmp(amp.AMP):
         l = []
         for k, v in self.parent.controller.devices.iteritems():
             if dev_type == '':
-                l.append(k)
+                l.append(json.dumps({k: v}))
             elif v['devType'] == dev_type:
-                l.append(k)
+                l.append(json.dumps({k: v}))
         return {'devices': l}
 
     @DeviceInfo.responder

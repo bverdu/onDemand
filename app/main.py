@@ -91,33 +91,56 @@ class Main(BoxLayout):
     def on_location(self, inst, value):
         print('***********New Location***********%s' % value)
 
-    def on_device(self, res, uid):
-        if isinstance(res, dict):
-            res = res['value']
-        if not isinstance(res, list):
-            res = [res]
-        for data in res:
-            val = data.split(':')
-            v = ':'.join(val[1:])
-            print('new device : %s, %s=%s' % (uid, val[0], v))
-            if uid in self.devices:
-                self.devices[uid].update({val[0]: v})
-            else:
-                self.devices.update({uid: {val[0]: v}})
-            if val[0] == 'devtype':
-                v = ':'.join(val[1:])
-                for item in ('Source', 'BinaryLight',
-                             'HVAC_System', 'HVAC_ZoneThermostat',
-                             'MediaRenderer', 'SensorManagement'):
-                    if item in v:
-                        self.devices[uid].update({'ignored': False})
-                    else:
-                        self.devices[uid].update({'ignored': True})
-            if val[0] == 'loc':
-                country, city, name, room = v.split('/')
-                if name not in self._locations:
-                    self._locations.update({name: '/'.join((country, city))})
-                    self.locations.append(name)
+    def on_device(self, d, uid):
+#         if isinstance(res, dict):
+#             res = res['value']
+#         if not isinstance(res, list):
+#             res = [res]
+        print('new device : %s: %s' % (uid, d))
+        if not isinstance(d, dict):
+            d = json.loads(d, encoding='utf-8')
+        ignored = True
+        if 'devtype' in d:
+            if d['devtype'] in ('Source', 'BinaryLight', 'HVAC_System',
+                        'HVAC_ZoneThermostat', 'MediaRenderer',
+                        'SensorManagement'):
+                ignored = False
+        d.update({'ignored': ignored})
+        self.devices.update({'uid': d})
+        if 'loc' in d and d['loc']:
+            country, city, name, room = d['loc'].split('/')
+            if name not in self._locations:
+                self._locations.update({name: '/'.join((country, city))})
+                self.locations.append(name)
+            print('device %s in room %s at %s found' % (d['name'], room, name))
+            
+                
+#         if uid in self.devices:
+#             self.devices.update({uid: res})
+#         else:
+#         self.devices.update({uid: res})
+#         for data in res:
+#             val = data.split(':')
+#             v = ':'.join(val[1:])
+#             print('new device : %s, %s=%s' % (uid, val[0], v))
+#             if uid in self.devices:
+#                 self.devices[uid].update({val[0]: v})
+#             else:
+#                 self.devices.update({uid: {val[0]: v}})
+#             if val[0] == 'devtype':
+#                 v = ':'.join(val[1:])
+#                 for item in ('Source', 'BinaryLight',
+#                              'HVAC_System', 'HVAC_ZoneThermostat',
+#                              'MediaRenderer', 'SensorManagement'):
+#                     if item in v:
+#                         self.devices[uid].update({'ignored': False})
+#                     else:
+#                         self.devices[uid].update({'ignored': True})
+#             if val[0] == 'loc':
+#                 country, city, name, room = v.split('/')
+#                 if name not in self._locations:
+#                     self._locations.update({name: '/'.join((country, city))})
+#                     self.locations.append(name)
 
     def connect(self):
         print('1')
@@ -164,10 +187,14 @@ class Main(BoxLayout):
 
     def check_devices(self, devices):
         for device in devices['devices']:
-            if device not in self.devices:
-                print('check 1')
-                d = self.controller_service.callRemote(DeviceInfo, uuid=device)
-                d.addCallback(self.on_device, device)
+            d = json.loads(device, encoding='utf-8')
+            for k, v in d.iteritems():
+                if k not in self.devices:
+                    self.on_device(v, k)
+#             if device not in self.devices:
+#                 print('check 1')
+#                 d = self.controller_service.callRemote(DeviceInfo, uuid=device)
+#                 d.addCallback(self.on_device, device)
 
     def started(self, started):
         #         print(started['started'])
