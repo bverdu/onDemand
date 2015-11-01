@@ -15,6 +15,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.carousel import Carousel
 from kivy.support import install_twisted_reactor
+from twisted.protocols.amp import UNKNOWN_ERROR_CODE
 install_twisted_reactor()
 from device.weather import WeatherBox  # @UnusedImport @IgnorePep8
 from onDemand.plugins.weather import Weather as Weather_api  # @IgnorePep8
@@ -57,28 +58,31 @@ class Main(BoxLayout):
     devices = {}
     _locations = {}
     location = StringProperty('')
-    locations = []
+    locations = ListProperty()
+    old_locations = []
     weather = ObjectProperty()
     slide_index = DictProperty({})
 
     def __init__(self, app, **kwargs):
         super(Main, self).__init__()
         self.config = app.config
+        self.config.add_callback(self.on_config)
         for loc in [e.strip().strip('\'')
-                    for e in self.config.getdefault(
+                    for e in self.config.get(
                 'Locations',
-                'locations',
-                ['Home(France/Paris)'])[1:-1].split(',')]:
+                'locations')[1:-1].split(',')]:
             items = loc.split('(')
-            name = items[0]
-            l = items[1].strip(')')
+            print(items)
+            name = self.config.get(loc, 'name')
+            l = self.config.get(loc, 'location')
+#             name = items[0]
+#             l = items[1].strip(')')
             self._locations.update({name: l})
             self.locations.append(name)
         self.previous = ''
-        self.default = self.config.getdefault(
+        self.default = self.config.get(self.config.get(
             'Locations',
-            'default',
-            ['Home(France/Paris)']).split('(')[0]
+            'default'), 'name')
         if self._locations[self.default]:
             self.location = self._locations[self.default]
         self.menu_items = self.locations
@@ -87,9 +91,43 @@ class Main(BoxLayout):
         self.cr.slide_index = {}
         self.add_widget(self.cr)
         self.connect()
+        
+    def on_config(self, section, key, value):
+        print('%s: %s --> %s' % (section, key, value))
 
     def on_location(self, inst, value):
         print('***********New Location***********%s' % value)
+        
+    def on_locations(self, inst, value):
+        self.menu_items = value
+        print(value)
+        print(self.old_locations)
+        if len(value) > len(self.old_locations):
+            i = len(self.cr.slides)
+            new = [l for l in value if l not in self.old_locations]
+            for loc in new:
+                self.cr.add_widget(
+                Location(
+                    name=loc,
+                    landscape=self.landscape,
+                    location=self._locations[loc]))
+                self.slide_index.update({loc: i})
+                i += 1
+        else:
+            new = [l for l in self.old_locations if l not in value]
+            for loc in new:
+                for w in self.cr.slides:
+                    if loc == w.name:
+                        self.cr.remove_widget(w)
+                del self.slide_index[loc]
+        if self.default in value:
+            self.cr.index = self.slide_index[self.default]
+        else:
+            print('not a location')
+        print(self.slide_index)
+        print(self.cr.slides)
+        self.old_locations = [l for l in value]
+        
 
     def on_device(self, d, uid):
 #         if isinstance(res, dict):
@@ -98,7 +136,11 @@ class Main(BoxLayout):
 #             res = [res]
         print('new device : %s: %s' % (uid, d))
         if not isinstance(d, dict):
-            d = json.loads(d, encoding='utf-8')
+            try:
+                d = json.loads(d, encoding='utf-8')
+            except:
+                print ('bad device: %s' % d)
+                return
         ignored = True
         if 'devtype' in d:
             if d['devtype'] in ('Source', 'BinaryLight', 'HVAC_System',
@@ -109,10 +151,30 @@ class Main(BoxLayout):
         self.devices.update({'uid': d})
         if 'loc' in d and d['loc']:
             country, city, name, room = d['loc'].split('/')
-            if name not in self._locations:
-                self._locations.update({name: '/'.join((country, city))})
-                self.locations.append(name)
-            print('device %s in room %s at %s found' % (d['name'], room, name))
+        else:
+            name = 'Unknown'
+            room = 'Unknown'
+            country = 'France'
+            city = 'Marseille'
+        if name not in self._locations:
+            self._locations.update({name: '/'.join((country, city))})
+            self.locations.append(name)
+        elif self._locations[name] != '/'.join((country, city)):
+            if self._locations[name][-1].isdigit():
+                name = self._locations[name] + '_' + bytes(
+                                            int(self._locations[name][-1] + 1))
+            else:
+                name = self._locations[name] + '_1'
+            self._locations.update({name: '/'.join((country, city))})
+            self.locations.append(name)
+        print('device %s in room %s at %s found' % (d['name'], room, name))
+        for loc in self.cr.slides:
+#             print(loc.name)
+#             print(name)
+            if loc.name == name:
+#                 print('bingooooo')
+#                 print(loc.devices)
+                loc.devices.append(d)
             
                 
 #         if uid in self.devices:
@@ -210,24 +272,24 @@ class Main(BoxLayout):
             for w in self.cr.slides:
                 w.change_orientation(self.landscape)
             return
-        else:
-            i = 0
-            current = self.default
-            print(self.locations)
-            for loc in self.locations:
-                self.cr.add_widget(
-                    Location(
-                        name=loc,
-                        landscape=self.landscape,
-                        location=self._locations[loc]))
-                self.slide_index.update({loc: i})
-                i += 1
-        if current in self.locations:
-            self.cr.index = self.slide_index[current]
-        else:
-            print('not a location')
-        print(self.slide_index)
-        print(self.cr.slides)
+#         else:
+#             i = 0
+#             current = self.default
+#             print(self.locations)
+#             for loc in self.locations:
+#                 self.cr.add_widget(
+#                     Location(
+#                         name=loc,
+#                         landscape=self.landscape,
+#                         location=self._locations[loc]))
+#                 self.slide_index.update({loc: i})
+#                 i += 1
+#         if current in self.locations:
+#             self.cr.index = self.slide_index[current]
+#         else:
+#             print('not a location')
+#         print(self.slide_index)
+#         print(self.cr.slides)
 
     def on_size(self, *args, **kwargs):
 
@@ -299,29 +361,49 @@ class Location(RelativeLayout):
     background = StringProperty()
     location = StringProperty()
     name = StringProperty()
+    devices = ListProperty()
 
     def __init__(self, *args, **kwargs):
         super(Location, self).__init__(**kwargs)
         try:
-            self.background = 'data/graphics/' + self.name.decode(
-                'utf-8') + '.jpg'
+            background = '/'.join((os.path.dirname(__file__), 'data/graphics/' + self.name.decode(
+                'utf-8')))
         except UnicodeEncodeError:
-            self.background = 'data/graphics/' + self.name.encode(
-                'utf-8') + '.jpg'
-        print(self.background)
-        if self.landscape:
-            self.add_widget(
-                Loc_landscape(name=self.name, location=self.location))
+            background = '/'.join((os.path.dirname(__file__), 'data/graphics/' + self.name.encode(
+                'utf-8')))
+        print(background)
+        if os.path.exists(background + '.png'):
+            self.background = background + '.png'
+        elif os.path.exists(background + '.jpg'):
+            self.background = background + '.jpg'
         else:
-            self.add_widget(
-                Loc_portrait(name=self.name,  location=self.location))
+            self.background = 'data/graphics/Unknown.png'
+        print(self.background)
+        self.change_orientation(self.landscape)
+#         if self.landscape:
+#             
+#             self.add_widget(
+#                 Loc_landscape(name=self.name, location=self.location))
+#         else:
+#             ext = self.background[-4:]
+#             self.background = self.background[:-6] + '_p' + ext
+#             self.add_widget(
+#                 Loc_portrait(name=self.name,  location=self.location))
+            
+    def on_devices(self, inst, value):
+        print('....................%s...................' % value)
 
     def change_orientation(self, landscape=True):
         self.clear_widgets()
         if landscape:
+            if self.background[-6:-4] == '_p':
+                self.background = self.background[:-6] + self.background[-4:]
             self.add_widget(
                 Loc_landscape(name=self.name,  location=self.location))
         else:
+            ext = self.background[-4:]
+            self.background = self.background[:-4] + '_p' + ext
+            print(self.background)
             self.add_widget(
                 Loc_portrait(name=self.name,  location=self.location))
 
@@ -379,8 +461,8 @@ class mainApp(App):
             'weatherApiKey': '12345678'})
 
         config.setdefaults('Locations', {
-            'default': 'Home(France/Marseille)',
-            'locations': ['Home(France/Marseille)'],
+            'default': 'b744e767-72dd-45a5-91af-0d4fc6bd318b',
+            'locations': ['b744e767-72dd-45a5-91af-0d4fc6bd318b'],
             'parent': None})
 
         config.setdefaults('Connection Settings', {
@@ -390,7 +472,7 @@ class mainApp(App):
             'cloud_pwd': 'password'})
 
     def build_settings(self, settings):
-
+        print(self.sections)
         for section in self.sections:
             if section == 'hidden':
                 continue
@@ -419,7 +501,7 @@ class mainApp(App):
 
     def update_conf(self, section, key, value):
         open_ = False
-#         print(section)
+#         print('%s -- %s -- %s' % (self.sections, section, key))
         if section not in self.sections:
             self.sections.append(section)
         if key == 'locations':
@@ -428,6 +510,22 @@ class mainApp(App):
         elif key == 'rooms':
             itemtype = 'devices'
             prefix = 'r'
+#         elif key == 'name':
+#             if value != section.split('(')[0]:
+#                 l = section.split('(')
+#                 print('??%s   §§%s' % (value, l[0]))
+#                 items = self.config.items(section)
+#                 self.config.add_section('('.join((value,l[1])))
+#                 self.config.remove_section(section)
+#                 print(self.sections)
+#                 self.sections.remove(section)
+#                 print(self.sections)
+#                 for item in items:
+#                     self.config.set('('.join((value,l[1])), item[0], item[1])
+#                 
+#                 section = '('.join((value,l[1]))
+# #                 self.sections.append(section)
+#             prefix = 'd'
         else:
             prefix = 'd'
         if isinstance(value, list):
@@ -435,20 +533,22 @@ class mainApp(App):
                 if self.config.getdefault(item, 'name', True):
                     c = int(self.config.getdefault(
                         'hidden', 'counter', '0')) + 1
-                    self.config.setdefaults(remove_unicode(item),
+                    self.config.setdefaults(item,
                                             {'parent': section,
-                                             'name': item.split('(')[0],
-                                             'real_name': item,
+                                             'name': 'Home',
+                                             'real_name': 'Home(France/Marseille)',
+                                             'location': 'France/Marseille',
                                              itemtype: [],
                                              'default': False,
                                              'id': prefix + str(c)})
                     self.config.set('hidden', 'counter', c)
+                    
 
-        if self.close_settings():
-            open_ = True
+#         if self.close_settings():
+#             open_ = True
         self.destroy_settings()
-        if open_:
-            self.open_settings()
+#         if open_:
+#             self.open_settings()
 
 if __name__ == '__main__':
     root = mainApp()

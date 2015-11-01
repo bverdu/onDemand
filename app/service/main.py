@@ -6,7 +6,6 @@ Created on 22 sept. 2015
 '''
 import os
 import sys
-import inspect
 from twisted.python import log
 from twisted.internet import reactor
 from twisted.internet.protocol import Factory
@@ -14,7 +13,6 @@ from twisted.internet.endpoints import TCP4ServerEndpoint
 from twisted.application.internet import StreamServerEndpointService
 from plyer import notification
 from kivy.utils import platform
-from kivy.app import App
 
 
 if platform == 'android':
