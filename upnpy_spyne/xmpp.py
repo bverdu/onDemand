@@ -23,7 +23,6 @@ from spyne.protocol.soap import Soap11
 from upnpy_spyne.event import XmppEvent
 from upnpy_spyne.services import UserDefinedContext
 from upnpy_spyne.utils import get_default_v4_address
-from spyne.util import appreg
 from spyne_plus.server.twisted.xmpp import TwistedXMPPApp
 
 
@@ -54,23 +53,25 @@ class XmppService(Service):
         self.device = device
         device.parent = self
         for service in device.services:
-            if appreg.get_application(service.tns, service.name):
-                name = service.name + '_'
-            else:
-                name = service.name
-            soap_service = type(
-                service.name, (ServiceBase,), service.soap_functions)
-            soap_service.tns = service.tns
-            app = Application(
-                [soap_service],
-                tns=soap_service.tns,
-                in_protocol=Soap11(xml_declaration=False),
-                out_protocol=Soap11(xml_declaration=False),
-                name=name)
-            app.event_manager.add_listener('method_call', _map_context)
+            #             if appreg.get_application(service.tns, service.name):
+            #                 name = service.name + '_'
+            #             else:
+            #                 name = service.name
+            #             soap_service = type(
+            #                 service.name, (ServiceBase,), service.soap_functions)
+            #             soap_service.tns = service.tns
+            #             app = Application(
+            #                 [soap_service],
+            #                 tns=soap_service.tns,
+            #                 in_protocol=Soap11(xml_declaration=False),
+            #                 out_protocol=Soap11(xml_declaration=False),
+            #                 name=name)
+            #             app.event_manager.add_listener('method_call', _map_context)
             self.services.update(
                 {str(service.serviceId):
-                    {'app': TwistedXMPPApp(app), 'svc': service}})
+                    {'app': TwistedXMPPApp(service.app), 'svc': service}})
+            print('name: %s, methods: %s' %
+                  (device.name, service.app.interface.service_method_map))
             for var in service.stateVariables.values():
                 if var.sendEvents:
                     self.nodes.append(
@@ -115,9 +116,9 @@ class XmppService(Service):
 
     def disconnected(self, xs):
 
-        #  print 'Disconnected.'
+        print 'Disconnected.'
 
-        self.finished.callback(None)
+#         self.finished.callback(None)
 
     def authenticated(self, xs):
         #  print "Authenticated."
@@ -388,12 +389,12 @@ class XmppService(Service):
 
     def respond_rpc(self, resp, to, queryID):
         #         print('send: %s' % resp)
-        self.log.debug('respond rpc')
+        #         self.log.debug('respond rpc: %s' % resp[0][39:])
         res = IQ(self.xmlstream, 'result')
         res['id'] = queryID
         if resp:
             for item in resp:
-                res.addRawXml(item.decode('utf-8'))
+                res.addRawXml(item[39:].decode('utf-8'))  # Skip the xml header
         res.send(to=to)
 
     def on_presence(self, presence):

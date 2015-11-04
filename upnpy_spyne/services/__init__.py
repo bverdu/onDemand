@@ -16,52 +16,48 @@ from upnpy_spyne.event import EventSubscription, EventProperty
 from upnpy_spyne.upnp import ServiceResource, ServiceEventResource
 from upnpy_spyne.utils import make_element
 from lxml import etree as et
-
 from spyne.service import ServiceBase
 from spyne.application import Application
 from spyne.protocol.soap import Soap11
 from spyne.decorator import rpc
 from spyne.model import Unicode, Integer32, UnsignedInteger32, Boolean, Null
 from spyne.model.complex import ComplexModel
-from spyne.server.twisted import TwistedWebResource
 from spyne.util import appreg
 
 
 class Service(object):
 
-    __slots__ = ['version',
-                 'name',
-                 'client',
-                 'serviceType',
-                 'serviceId',
-                 'actions',
-                 'stateVariables',
-                 'event_properties',
-                 'subscription_timeout_range',
-                 '_description',
-                 'actionFunctions',
-                 '__dict__']
+    #     __slots__ = ['version',
+    #                  'client',
+    #                  'serviceId',
+    #                  'actions',
+    #                  'stateVariables',
+    #                  'event_properties',
+    #                  'subscription_timeout_range',
+    #                  '_description',
+    #                  'actionFunctions',
+    #                  '__dict__']
     version = (1, 0)
-    serviceType = None
     serviceUrl = None
     serviceId = None
     event_properties = None
     subscription_timeout_range = (1800, None)
     _description = None
-    name = ''
     client = None
-    soap_functions = {}
     upnp_type = 'upnp'
 
     def __init__(
-            self, name, tns, client=None, xml=None, appname='Application'):
+            self, svcname, tns, client=None, xml=None, appname='Application'):
         #         log.msg(self.__class__.stateVariables)
-        def _map_context(ctx):
-            ctx.udc = UserDefinedContext(client)
+        self.name = svcname
         self.client = client
+
+        def _map_context(ctx):
+            ctx.udc = UserDefinedContext(self.client)
         self.actions = {}
+        self.soap_functions = {}
         self.stateVariables = {}
-        self.name = name
+        self.app = None
         self.tns = self.serviceType = tns
         self.serviceUrl = tns.split(':')[-2].lower()
         if xml is not None:
@@ -73,8 +69,9 @@ class Service(object):
 #         print(self.__class__.stateVariables)
 #         print(self.__class__.stateVariables['SearchCapabilities'])
 #         print(self.__class__.actions.items())
-        for name, arguments in self.actions.items():
-            self.actions[name] = arguments
+#         print(self.actions.items())
+        for name, arguments in self.__class__.actions.items():
+            self.actions.update({name: arguments})
             args_in = []
             args_out = []
             for arg in arguments:
@@ -98,50 +95,27 @@ class Service(object):
                         % (name, arg.direction, arg.stateVariable))
             action_in_type = Null
             action_out_type = Null
-            #             action_in_varnames = ()
-#             action_in_varname = ''
             action_out_varnames = ()
             args = ()
             action_out_varname = ''
-#             f = func_template
             n = '_'.join(('r', cc_to_us(name)))
-#             if n in dir(__builtins__):
-#                 n = ''.join((n, '_',))
-#             f.name = n
-#             f.upnp_type = self.__class__.upnp_type
             f = make_func(n)
-#             f = Make_func(n, self.__class__.upnp_type)
             if len(args_in) > 0:
                 if len(args_in) > 1:
                     args = [arg[1] for arg in args_in]
                     action_in_type = [arg[0] for arg in args_in]
-#                     action_in_type = tuple(arg[0] for arg in args_in)
-#                     action_in_varnames = (arg[1] for arg in args_in)
-#                     action_in_type = []
-#                     for arg_typ, arg_name in args_in:
-#                         action_in_type.append(arg_typ)
-#                         action_in_varnames.update(
-#                             {arg_name: 'arg_'+arg_name})
                 else:
                     action_in_type = args_in[0][0]
                     args = [args_in[0][1]]
-#                     f.args = cc_to_us(args_in[0][1])
-#                     action_in_varname = args_in[0][1]
             if len(args_out) > 0:
                 if len(args_out) > 1:
                     action_out_type = [arg[0] for arg in args_out]
                     action_out_varnames = [arg[1] for arg in args_out]
-#                     action_out_type = tuple(arg[0] for arg in args_out)
-#                     action_out_varnames = tuple(arg[1] for arg in args_out)
-#                     action_out_type = []
-#                     for arg_typ, arg_name in args_out:
-#                         action_out_type.append(arg_typ)
-#                         action_out_varnames.append(arg_name)
                 else:
                     action_out_type = args_out[0][0]
                     action_out_varname = args_out[0][1]
-#             print(f.name)
             if len(args_in) > 0:
+                print(args)
                 if len(args_in) > 1:
                     if len(args_out) > 0:
                         if len(args_out) > 1:
@@ -205,22 +179,20 @@ class Service(object):
 #             print(f.fname)
             self.soap_functions.update({name: func})
         self.subscriptions = {}
+        if appreg.get_application(self.tns, appname):
+            print('**/*/')
+            appname = appname + '_'
         soap_service = type(self.name, (ServiceBase,), self.soap_functions)
         soap_service.tns = self.tns
-#         print(dir(Playlist))
-#         print(dir(Playlist.Insert))
-#         print(dir(soap_service.Insert))
         app = Application([soap_service], tns=self.tns,
                           in_protocol=Soap11(),
                           out_protocol=Soap11(),
                           name=appname)
-#         app = Application([Playlist], tns=self.tns,
-#                         in_protocol=Soap11(),
-#                         out_protocol=Soap11())
         app.event_manager.add_listener('method_call', _map_context)
-        self.control_resource = TwistedWebResource(app)
-        self.event_resource = ServiceEventResource(self)
-        self.resource = ServiceResource(self)
+        self.app = app
+        print(self.soap_functions)
+        print('name: %s, methods: %s' %
+              (appname, app.interface.service_method_map))
         if self.event_properties is None:
             self.event_properties = {}
 

@@ -68,16 +68,16 @@ class TwistedXMPPApp(ServerBase):
                 log.error(ctx.out_string)
             return ctx.out_string
 
-        initial_ctx = MethodContext(self)
+        initial_ctx = MethodContext(self, MethodContext.SERVER)
         initial_ctx.in_string = element
-#         print(initial_ctx.in_string)
         for ctx in self.generate_contexts(initial_ctx, 'utf8'):
             # This is standard boilerplate for invoking services.
-            #             print(ctx)
+            if ctx.in_error:
+                print(ctx)
             try:
                 self.get_in_object(ctx)
             except AttributeError:
-                #                 log.error(ctx.out_string)
+                log.error(ctx.out_string)
                 return defer.succeed(UPNP_ERROR % (serviceId,
                                                    ctx.in_error.faultcode,
                                                    ctx.in_error.faultstring))
@@ -85,7 +85,6 @@ class TwistedXMPPApp(ServerBase):
                 self.get_out_string(ctx)
                 log.error(''.join(ctx.out_string))
                 continue
-
             self.get_out_object(ctx)
             if ctx.out_error:
                 self.get_out_string(ctx)

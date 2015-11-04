@@ -17,6 +17,7 @@ class Fake_HE_endpoint(object):
     clients = {}
 
     def __init__(self, reactor, bus_addr, addr, speed):
+        self.random = False
         self.log = Logger()
         self.reactor = reactor
         self.bus_addr = bus_addr
@@ -41,8 +42,9 @@ class Fake_HE_endpoint(object):
                 client.connectionMade()
             self.running = True
             self.bus = True
-        l = '1623426601'
-        ll = '3344556600'
+        self.random = not self.random
+        l = '162342660' + str(int(self.random))
+        ll = '334455660' + str(int(not self.random))
         if l[:-1] in self.clients:
             self.clients[l[:-1]].lineReceived(l)
         if ll[:-1] in self.clients:

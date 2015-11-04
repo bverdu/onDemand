@@ -18,9 +18,9 @@ class HE_factory(ClientFactory, Client):
 
     actions = ('set_target', 'set_status')
     room = 'Home'
-    status = False
 
     def __init__(self, key='00000001', group=0, net_type='lan'):
+        self.status = False
         self.init = True
         self.proto = i2cProtocol()
         self.addr = ''.join((str(key), str(group),))
@@ -45,6 +45,7 @@ class HE_factory(ClientFactory, Client):
         return self.room
 
     def r_set_target(self, value):
+        print('**************************************************')
         if (value is not self.status) or self.init:
             self.init = False
             if value is True:

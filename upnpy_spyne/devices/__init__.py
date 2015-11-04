@@ -29,7 +29,6 @@ class Device(object):
                  'version',
                  'uuid',
                  'datadir',
-                 'services',
                  'devices',
                  'namespaces',
                  'extras',

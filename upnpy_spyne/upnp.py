@@ -13,6 +13,7 @@ from twisted.python import log
 from twisted.web import server, static
 from twisted.web.error import UnsupportedMethod
 from twisted.web.resource import Resource
+from spyne.server.twisted import TwistedWebResource
 from upnpy_spyne.device import DeviceIcon
 from upnpy_spyne.utils import get_default_v4_address
 # import tracemalloc
@@ -39,6 +40,10 @@ class UPnPService(StreamServerEndpointService):
         edp = endpoints.serverFromString(reactor, "tcp:0")
         StreamServerEndpointService.__init__(self, edp, self.site)
         self._choosenPort = None
+        for service in device.services:
+            service.control_resource = TwistedWebResource(service.app)
+            service.event_resource = ServiceEventResource(service)
+            service.resource = ServiceResource(service)
 
     def privilegedStartService(self):
         r = super(UPnPService, self).privilegedStartService()
