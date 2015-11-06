@@ -4,13 +4,13 @@ Created on 17 avr. 2015
 
 @author: Bertrand Verdu
 '''
-import logging
-
+#  import logging
+import config
 from twisted.application import service
 from utils import load_yaml
 from util.main import get_subservices
 
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
 
 
 def makeService(args):
@@ -20,6 +20,7 @@ def makeService(args):
     mainService = service.MultiService()
     load_yaml(args['datadir'])
     services = get_subservices()()
+    mainService.config = config
     for sub_service in services:
         mainService.services.append(sub_service)
         sub_service.parent = mainService

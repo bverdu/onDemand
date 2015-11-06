@@ -7,113 +7,11 @@ Created on 19 août 2015
 import importlib
 from uuid import uuid4
 from twisted.logger import Logger
+from twisted.web import static
 from onDemand import config
 from onDemand.utils import save_yaml
 
 log = Logger()
-
-
-# def get_subservices(conf=config):
-#
-#     endpoints = {}
-#     clients = {}
-#     services = []
-#     webserver = None
-#
-#     for room, dic in conf.rooms.items():
-#
-#         for client in dic['clients']:
-#
-#             if client['type'] in conf.hmodules:
-#
-#                 hwopts = conf.hmodules[client['type']]['options']
-#                 module_name = conf.hmodules[client['type']]['module']
-#
-#                 if client['type'] not in endpoints:
-#
-#                     t = getattr(
-#                         importlib.import_module(
-#                             'onDemand.plugins.' + module_name),
-#                         'get_' + client['type'])
-#                     d = {}
-#                     d.update(hwopts if isinstance(hwopts, dict) else {})
-#                     d.update(client['options'])
-#                     d.update({'net_type': config.network})
-#                     e, f = t(**d)
-#                     if e:
-#                         endpoints.update({client['type']: e})
-#                 else:
-#
-#                     t = getattr(
-#                         importlib.import_module(
-#                             'onDemand.plugins.' + module_name),
-#                         client['type'] + '_factory')
-#                     d = client['options']
-#                     d.update({'net_type': config.network})
-#                     f = t(**d)
-#                     endpoints[client['type']].connect(f)
-#                 f.room = room
-#
-#                 if room not in clients:
-#
-#                     clients.update({room: {}})
-#                 clients[room].update({client['name']: f})
-#
-#                 if client['service'] == 'MediaRenderer':
-#
-#                     for mt in conf.media_types:
-#
-#                         if mt == 'oh':
-#
-#                             from upnpy_spyne.devices.ohSource import Source
-#                             device = Source(client['name'],
-#                                             f,
-#                                             conf.datadir)
-#                         else:
-#
-#                             from upnpy_spyne.devices.mediarenderer\
-#                                 import MediaRenderer
-#                             device = MediaRenderer(
-#                                 client['name'], f, conf.datadir)
-#                 else:
-#
-#                     device = getattr(
-#                         importlib.import_module(
-#                             'upnpy_spyne.devices.' +
-#                             client['service'].lower()),
-#                         'MainDevice')(client['name'], f, conf.datadir)
-#
-#                 if config.network in ('lan', 'both'):
-#
-#                     from upnpy_spyne.upnp import UPnPService
-#                     from upnpy_spyne.ssdp import SSDPServer
-#                     upnp_server = UPnPService(device)
-#                     services.append(upnp_server)
-#                     ssdp_server = SSDPServer(device)  # SSDP
-#                     services.append(ssdp_server)
-#
-#                 if config.network in ('cloud', 'both'):
-#
-#                     if not webserver:
-#                         from onDemand.protocols.webserver import Local_server
-#                         webserver = Local_server()
-#                         services.append(webserver)
-#                     from upnpy_spyne.xmpp import XmppService
-#                     svc = []
-#                     xmppService = XmppService(device,
-#                                               user=conf.cloud_user,
-#                                               secret=conf.cloud_secret,
-#                                               web_server=webserver)
-#                     svc.append(xmppService)
-#                     for dev in device.devices:
-#                         svc.append(XmppService(dev,
-#                                                user=conf.cloud_user,
-#                                                secret=conf.cloud_secret,
-#                                                web_server=webserver))
-#                     for xmpp in svc:
-#                         services.append(xmpp)
-#
-#     return services
 
 
 class get_subservices(object):
@@ -124,7 +22,9 @@ class get_subservices(object):
         self.services = []
         self.conf = conf
         self.webserver = None
+        self.Userver = None
         updated = False
+        self.web_ui = static.File(conf.datadir + 'web')
 
         if hasattr(conf, 'countries'):
             for country in conf.countries['countries']:
@@ -234,17 +134,22 @@ class get_subservices(object):
 
                 from upnpy_spyne.upnp import UPnPService
                 from upnpy_spyne.ssdp import SSDPServer
-                upnp_server = UPnPService(upnp_device)
-                self.services.append(upnp_server)
+                if not self.Userver:
+                    self.Userver = UPnPService(upnp_device)
+                    self.services.append(self.Userver)
+                else:
+                    self.Userver.add_device(upnp_device)
                 ssdp_server = SSDPServer(upnp_device)  # SSDP
                 self.services.append(ssdp_server)
 
             if config.network in ('cloud', 'both'):
 
-                if not self.webserver:
-                    from onDemand.protocols.webserver import Local_server
-                    self.webserver = Local_server()
-                    self.services.append(self.webserver)
+                if config == 'cloud':
+                    if not self.webserver:
+                        from onDemand.protocols.webserver import Local_server
+                        self.webserver = Local_server(upnp_device)
+                        self.services.append(self.webserver)
+
                 from upnpy_spyne.xmpp import XmppService
                 svc = []
                 xmppService = XmppService(upnp_device,

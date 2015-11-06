@@ -190,9 +190,9 @@ class Service(object):
                           name=appname)
         app.event_manager.add_listener('method_call', _map_context)
         self.app = app
-        print(self.soap_functions)
-        print('name: %s, methods: %s' %
-              (appname, app.interface.service_method_map))
+#         print(self.soap_functions)
+#         print('name: %s, methods: %s' %
+#               (appname, app.interface.service_method_map))
         if self.event_properties is None:
             self.event_properties = {}
 

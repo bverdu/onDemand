@@ -33,7 +33,7 @@ class UPnPService(StreamServerEndpointService):
         Initialization of UPnP server
         '''
         self.upnp = UPnP(device)
-        self.device = device
+        self.devices = [device]
         device.parent = self
         self.upnp.parent = self
         self.site = server.Site(self.upnp)
@@ -60,22 +60,44 @@ class UPnPService(StreamServerEndpointService):
     def startService(self):
         '''
         '''
-        self.device.location = "http://%s:" + str(self.getPort())
-        self.device.icons = [
-            DeviceIcon(
-                'image/png',
-                32, 32, 24,
-                self.device.getLocation(
-                    get_default_v4_address()) + '/pictures/icon.png')
-        ]
+        self.location = "http://%s:" % get_default_v4_address() + str(
+            self.getPort())
+        for device in self.devices:
+            device.location = "http://%s:" + str(self.getPort())
+            device.icons = [
+                DeviceIcon(
+                    'image/png',
+                    32, 32, 24,
+                    device.getLocation(
+                        get_default_v4_address(
+                        )) + '/pictures/icon.png')]
         log.msg('UPnP Service Started', loglevel=logging.INFO)
+        self.started = True
+
+    def add_device(self, device):
+        self.devices.append(device)
+        device.parent = self
+        if self.started:
+            device.location = "http://%s:" + str(self.getPort())
+            device.icons = [
+                DeviceIcon(
+                    'image/png',
+                    32, 32, 24,
+                    device.getLocation(
+                        get_default_v4_address(
+                        )) + '/pictures/icon.png')]
+        for service in device.services:
+            service.control_resource = TwistedWebResource(service.app)
+            service.event_resource = ServiceEventResource(service)
+            service.resource = ServiceResource(service)
+        self.upnp.addDevice(device)
 
     def register_art_url(self, url, cloud=False):
         newurl = hashlib.md5(url).hexdigest() + url[-4:]
         self.upnp.putChild(
             newurl,
             static.File(url))
-        return self.device.getLocation(get_default_v4_address()) + '/' + newurl
+        return self.location + '/' + newurl
 
 
 class ServeResource(Resource):
@@ -96,6 +118,30 @@ class ServeResource(Resource):
         request.clientproto = 'HTTP/1.1'
         log.msg('Rendering Resource: %s' % self.data, loglevel=logging.DEBUG)
         return self.data
+
+
+class DeviceResource(Resource):
+    isLeaf = False
+
+    def __init__(self, device):
+        self.device = device
+        Resource.__init__(self)
+
+    def getChild(self, path, request):
+        if path == 'desc':
+            return ServeResource(self.device.dumps(), 'text/xml')
+
+        for service in self.device.services:
+            if path == service.serviceUrl:
+                #                 print ('%s --> %s' %(path, service.resource))
+                return service.resource
+
+        for device in self.device.devices:
+            if path == device.deviceURL:
+                return ServeResource(device.dumps(), 'text/xml')
+
+        log.msg("unhandled request %s" % path, loglevel=logging.DEBUG)
+        return Resource()
 
 
 class ServiceResource(Resource):
@@ -231,17 +277,20 @@ class ServiceEventResource(Resource):
 
 
 class UPnP(Resource):
-    __slots__ = ['isLeaf', 'device', 'running', '__dict__']
+    #     __slots__ = ['isLeaf', 'device', 'running', '__dict__']
     isLeaf = False
 
     def __init__(self, device):
         """UPnP Control Server
         :type device: Device
         """
+        self.webui = static.File(device.datadir + 'web')
         Resource.__init__(self)
-        self.device = device
+#         self.web_ui = resource
+        self.devices = {device.uuid: device}
         self.running = False
-        self.putChild("pictures", static.File(device.datadir + 'icons'))
+        self.putChild(
+            device.uuid + "/pictures", static.File(device.datadir + 'icons'))
 
     def stop(self):
         if not self.running:
@@ -251,24 +300,33 @@ class UPnP(Resource):
         self.running = False
 
     def getChild(self, path, request):
-        # Hack to fix twisted not accepting absolute URIs
-        #   path, request = twisted_absolute_path(path, request)
-        #         log.msg("upnp request: path:%s Request:%s" % (path, request),
-        #                 loglevel=logging.DEBUG)
-        if path == '':
-            return ServeResource(self.device.dumps(), 'text/xml')
+        print(request)
+        if path in self.devices:
+            dev = self.devices[path]
+            if dev.UResource is None:
+                dev.UResource = DeviceResource(self.devices[path])
+            return dev.UResource
 
-        for service in self.device.services:
-            if path == service.serviceUrl:
-                #                 print ('%s --> %s' %(path, service.resource))
-                return service.resource
+        if request.method == 'POST' and path == '':
+            return WebUi(self.parent.parent)
 
-        for device in self.device.devices:
-            if path == device.deviceURL:
-                return ServeResource(device.dumps(), 'text/xml')
+        return self.webui.getChild(path, request)
 
-        log.msg("unhandled request %s" % path, loglevel=logging.DEBUG)
-        return Resource()
+    def addDevice(self, device):
+        self.devices.update({device.uuid: device})
+        self.putChild(
+            device.uuid + "/pictures", static.File(device.datadir + 'icons'))
+
+
+class WebUi(Resource):
+
+    def __init__(self, mainService):
+        self.app = mainService
+        Resource.__init__(self)
+
+    def render_POST(self, request):
+        return '<html><body>You submitted: %s by %s </body></html>' % (
+            request.args, self.app.config.network)
 
 
 def getHeader(request, name, required=True, default=None):

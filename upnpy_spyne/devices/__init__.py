@@ -37,6 +37,7 @@ class Device(object):
                  'server',
                  '__dict__']
     version = (1, 0)
+    parent = None
     # Description
     deviceURL = ''
     deviceType = None
@@ -57,6 +58,7 @@ class Device(object):
     server = "Linux/x86_64 UPnP/1.0 upnpy/0.9"
 
     def __init__(self, path):
+        self.UResource = None
         self.extras = {}
         # Description
         n = path.split('/')
@@ -86,10 +88,13 @@ class Device(object):
             '': 'urn:schemas-upnp-org:device-1-0'
         })
 
-    def getLocation(self, address):
+    def getLocation(self, address, desc=True):
         if '@' in self.location:
             return self.location
-        return self.location % address
+        if desc:
+            return self.location % address + '/' + self.uuid + '/desc'
+        else:
+            return self.location % address + '/' + self.uuid
 
     def getweburl(self, address):
         return self.weburl % address
@@ -159,11 +164,14 @@ class Device(object):
             _service.append(make_element('serviceId', service.serviceId))
             _service.append(make_element(
                             'controlURL',
-                            '/' + service.serviceUrl + '/control'))
+                            '/' + self.uuid + '/' +
+                            service.serviceUrl + '/control'))
             _service.append(make_element(
                             'eventSubURL',
-                            '/' + service.serviceUrl + '/event'))
-            _service.append(make_element('SCPDURL', '/' + service.serviceUrl))
+                            '/' + self.uuid + '/' +
+                            service.serviceUrl + '/event'))
+            _service.append(make_element('SCPDURL', '/' + self.uuid + '/' +
+                                         service.serviceUrl))
             serviceList.append(_service)
         device.append(serviceList)
 

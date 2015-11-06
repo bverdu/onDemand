@@ -297,8 +297,8 @@ class Playlist(object):
                     url = self.mpd.parent.parent.register_art_url(
                         f, cloud=True)
                 else:
-                    log.error(f)
                     url = self.mpd.parent.parent.register_art_url(f)
+                    log.debug('%s --> %s' % (f, url))
                 track.update({'albumArtURI': url})
             else:
                 url = None
