@@ -99,8 +99,8 @@ if __name__ == '__main__':
         fact._write('help\r\n')
         
     edp, fact = get_sms('/dev/ttyACM0', event_fct=show, baudrate=38400, rtscts=1)
-    reactor.callWhenRunning(test, fact)
-    reactor.callLater(10, reactor.stop)
-    reactor.run()
+    reactor.callWhenRunning(test, fact)  # @UndefinedVariable
+    reactor.callLater(10, reactor.stop)  # @UndefinedVariable
+    reactor.run()  # @UndefinedVariable
     
     

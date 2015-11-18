@@ -119,7 +119,28 @@ class Iot(Client):
         #         self._sensors = []
         self._data = {}
         self.events = {}
-        super(Iot, self).__init__(*args, **kwargs)
+        if 'sensors' in kwargs:
+            self.sensors = kwargs['sensors']
+        else:
+            self.sensors = []
+#         super(Iot, self).__init__(*args, **kwargs)
+
+    def struct_to_sensorStruct(self, dics=[]):
+        sensors = {}
+        cols = 0
+        i = 0
+        for dic in dics:
+            cols += len(dic)
+            s = 0
+            for k, v in dic.iteritems():
+                sensors.update({'SensorEvents': '',
+                                'SensorNumberOfEntries': len(dic),
+                                'SensorCollections': {}})
+        sStruct = {'UPnP/SensorMgt': {'SensorEvents': '',
+                                'SensorCollectionsNumberOfEntries': len(dics),
+                                'SensorCollections': sensors}}
+        
+        
 
     def got_data(self, data):
         #  print('1')
