@@ -32,7 +32,7 @@ class BaseProtocol(serialBytesProtocol):
         self.requests = {}
         self.command_id = 0
         self.buffer = None
-#         self.reading = False       
+#         self.reading = False
 
     def get_id(self):
         try:
@@ -41,7 +41,7 @@ class BaseProtocol(serialBytesProtocol):
         except ValueError:
             self.command_id = 1
             return intToByte(1)
-        
+
     def connect(self, f):
         if f.callback:
             self.callbacks.append(f.callback)

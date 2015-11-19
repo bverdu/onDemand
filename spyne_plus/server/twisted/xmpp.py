@@ -18,6 +18,8 @@ from spyne import MethodContext
 from spyne.model import ComplexModelBase
 from spyne.server import ServerBase
 
+logging.basicConfig(level=logging.INFO)
+
 
 UPNP_ERROR = '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"'\
     + ' s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" >'\

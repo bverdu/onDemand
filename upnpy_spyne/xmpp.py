@@ -371,13 +371,10 @@ class XmppService(Service):
 #                 print(root.toXml())
                 for child in root.children:
                     if child.name == 'Header':
-                        self.log.debug('header')
                         res = self.services[
                             child.children[0]['serviceId']]['app'].handle_rpc(
                                 root.toXml(), child.children[0]['serviceId'])
                     elif child.name == 'Body':
-                        self.log.debug('body')
-                        self.log.debug(self.services)
                         decomposed = child.children[0].uri.split(':')
                         guessed_id = ':'.join(
                             (decomposed[0],
@@ -387,6 +384,9 @@ class XmppService(Service):
                         res = self.services[
                             str(guessed_id)]['app'].handle_rpc(
                                 root.toXml(), str(guessed_id))
+                    else:
+                        self.log.warn('bad iq request: %s' % child.name)
+                        continue
 
                     res.addCallback(self.respond_rpc, iq['from'], iq['id'])
 

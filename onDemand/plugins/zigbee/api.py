@@ -16,7 +16,7 @@ log = Logger()
 
 class Frame(object):
     """
-    Represents a frame of data to be sent to or which was received 
+    Represents a frame of data to be sent to or which was received
     from an XBee device
     """
 
@@ -36,8 +36,8 @@ class Frame(object):
         """
         checksum: None -> single checksum byte
 
-        checksum adds all bytes of the binary, unescaped data in the 
-        frame, saves the last byte of the result, and subtracts it from 
+        checksum adds all bytes of the binary, unescaped data in the
+        frame, saves the last byte of the result, and subtracts it from
         0xFF. The final result is the checksum
         """
         total = 0
@@ -55,17 +55,16 @@ class Frame(object):
         """
         verify: 1 byte -> boolean
 
-        verify checksums the frame, adds the expected checksum, and 
-        determines whether the result is correct. The result should 
+        verify checksums the frame, adds the expected checksum, and
+        determines whether the result is correct. The result should
         be 0xFF.
         """
         total = 0
         # Add together all bytes
         for byte in self.data:
             total += byteToInt(byte)
-            
+
         #  total += byteToInt(self.data[-1])
-        
 
         # Only keep low bits
         total &= 0xFF
@@ -77,7 +76,7 @@ class Frame(object):
         """
         len_data: None -> (MSB, LSB) 16-bit integer length, two bytes
 
-        len_bytes counts the number of bytes to be sent and encodes the 
+        len_bytes counts the number of bytes to be sent and encodes the
         data length in two bytes, big-endian (most significant first).
         """
         count = len(self.data)
@@ -87,7 +86,7 @@ class Frame(object):
         """
         output: None -> valid API frame (binary data)
 
-        output will produce a valid API frame for transmission to an 
+        output will produce a valid API frame for transmission to an
         XBee module.
         """
         # start is one byte long, length is two bytes

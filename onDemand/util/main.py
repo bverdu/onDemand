@@ -106,7 +106,7 @@ class get_subservices(object):
                 d.update({'net_type': self.conf.network})
                 f = t(**d)
                 self.endpoints[device['type']].connect(f)
-                
+
             f.room = room
             if device['service'] == 'MediaRenderer':
 
@@ -144,8 +144,6 @@ class get_subservices(object):
                 self.services.append(ssdp_server)
 
             if config.network in ('cloud', 'both'):
-                
-                print(config.network)
 
                 if config.network == 'cloud':
                     if self.webserver is None:

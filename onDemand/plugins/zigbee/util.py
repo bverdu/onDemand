@@ -1,5 +1,4 @@
 # encoding: utf-8
-
 """
 python2to3.py
 By Paul Malmsten, 2011

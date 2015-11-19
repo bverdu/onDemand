@@ -185,6 +185,22 @@ class ZigBee(BaseProtocol):
                               original))])])
     }
 
+    def connectionMade(self):
+        def got_info(data):
+            for callback in self.callbacks:
+                callback(data)
+        d = self.remote_at(
+            dest_addr_long=b'\x00\x00\x00\x00\x00\x00\xFF\xFF', command=b'IS')
+        d.addCallback(got_info)
+
+    def connect(self, f):
+        if f.callback:
+            self.callbacks.append(f.callback)
+            d = self.remote_at(
+                dest_addr_long=f.long_address, command=b'IS')
+            d.addCallback(f.callback)
+        f.proto = self
+
     def _parse_IS_at_response(self, packet_info):
         """
         If the given packet is a successful remote AT response for an IS
@@ -269,28 +285,28 @@ if __name__ == '__main__':
                     if s['dio-1'] and not proto.green:
                         print('green !!!')
                     proto.green = s['dio-1']
-#                         if not proto.red:
-#                             f = proto.remote_at(dest_addr_long=dest_addr_long,
-#                                                 command=b'D2', parameter=b'\x05')
-#                             proto.red = True
-#                     else:
-#                         if proto.red:
-#                             f = proto.remote_at(dest_addr_long=dest_addr_long,
-#                                                 command=b'D2', parameter=b'\x04')
-#                             proto.red = False
-#                 if 'adc-0' in s:
-#                     if s['adc-0'] > 1000:
-#                         print('green')
-#                         if not proto.green:
-#                             f = proto.remote_at(dest_addr_long=dest_addr_long,
-#                                                 command=b'D3', parameter=b'\x05')
-# 
-#                             proto.green = True
-#                     else:
-#                         if proto.green:
-#                             f = proto.remote_at(dest_addr_long=dest_addr_long,
-#                                                 command=b'D3', parameter=b'\x04')
-#                             proto.green = False
+#                     if not proto.red:
+#                         f = proto.remote_at(dest_addr_long=dest_addr_long,
+#                                             command=b'D2', parameter=b'\x05')
+#                         proto.red = True
+#                 else:
+#                     if proto.red:
+#                         f = proto.remote_at(dest_addr_long=dest_addr_long,
+#                                             command=b'D2', parameter=b'\x04')
+#                         proto.red = False
+#             if 'adc-0' in s:
+#                 if s['adc-0'] > 1000:
+#                     print('green')
+#                     if not proto.green:
+#                         f = proto.remote_at(dest_addr_long=dest_addr_long,
+#                                             command=b'D3', parameter=b'\x05')
+#
+#                         proto.green = True
+#                 else:
+#                     if proto.green:
+#                         f = proto.remote_at(dest_addr_long=dest_addr_long,
+#                                             command=b'D3', parameter=b'\x04')
+#                         proto.green = False
                 if f:
                     f.addCallback(show, 'Digital set')
 
