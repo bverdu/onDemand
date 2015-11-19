@@ -6,10 +6,9 @@ Created on 21 avr. 2015
 
 @author: Bertrand Verdu
 '''
-import sys
-from twisted.internet import reactor
 from twisted.internet.protocol import ClientFactory
 from twisted.python import log
+from twisted.internet import reactor
 from . import Client
 from onDemand.protocols.i2c import i2cProtocol, HE_endpoint, Fake_HE_endpoint
 
@@ -89,6 +88,7 @@ def get_HE(bus=1, addr='0x04', speed=1, key='00000000', group=0, net_type='lan')
     return e, f
 
 if __name__ == '__main__':
+    import sys
     from . import Trigger
 
     def show(*args):
