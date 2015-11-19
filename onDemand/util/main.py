@@ -144,8 +144,8 @@ class get_subservices(object):
 
             if config.network in ('cloud', 'both'):
 
-                if config == 'cloud':
-                    if not self.webserver:
+                if config.network == 'cloud':
+                    if self.webserver is None:
                         from onDemand.protocols.webserver import Local_server
                         self.webserver = Local_server(upnp_device)
                         self.services.append(self.webserver)
