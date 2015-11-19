@@ -34,11 +34,12 @@ class ZigBee(BaseProtocol):
         BaseProtocol.__init__(self, *args, **kwargs)
 #         super(ZigBee, self).__init__(*args, **kwargs)
 
-    api_frames = {"at": OrderedDict([
-        ('id',          {'len': 1,    'default': b'\x08'}),
-        ('frame_id',    {'len': 1,    'default': b'\x01'}),
-        ('command',     {'len': 2,    'default': None}),
-        ('parameter',   {'len': None, 'default': None})]),
+    api_frames = {
+        "at": OrderedDict([
+            ('id',          {'len': 1,    'default': b'\x08'}),
+            ('frame_id',    {'len': 1,    'default': b'\x01'}),
+            ('command',     {'len': 2,    'default': None}),
+            ('parameter',   {'len': None, 'default': None})]),
         "queued_at": OrderedDict([
             ('id',          {'len': 1,    'default': b'\x09'}),
             ('frame_id',    {'len': 1,    'default': b'\x01'}),
@@ -294,7 +295,7 @@ if __name__ == '__main__':
                     f.addCallback(show, 'Digital set')
 
     global proto
-    proto = ZigBee(callback=receive)
+    proto = ZigBee(callback=receive, escaped=True)
     proto.red = False
     proto.green = False
 

@@ -7,7 +7,7 @@ Created on 12 nov. 2015
 from twisted.internet import defer
 from twisted.logger import Logger
 from onDemand.protocols.serial import serialBytesProtocol
-from onDemand.protocols.zigbee import Frame
+from onDemand.plugins.zigbee import Frame
 from util import byteToInt, intToByte
 
 
@@ -21,7 +21,10 @@ class BaseProtocol(serialBytesProtocol):
                  error_callback=None):
 
         serialBytesProtocol.__init__(self)
-        self.callback = callback
+        if callback:
+            self.callbacks = [callback]
+        else:
+            self.callbacks = []
         self.setRawMode()
         self.shorthand = shorthand
         self._escaped = escaped
@@ -29,7 +32,7 @@ class BaseProtocol(serialBytesProtocol):
         self.requests = {}
         self.command_id = 0
         self.buffer = None
-#         self.reading = False
+#         self.reading = False       
 
     def get_id(self):
         try:
@@ -38,6 +41,11 @@ class BaseProtocol(serialBytesProtocol):
         except ValueError:
             self.command_id = 1
             return intToByte(1)
+        
+    def connect(self, f):
+        if f.callback:
+            self.callbacks.append(f.callback)
+        f.proto = self
 
     def rawDataReceived(self, data):
         for byte in data:
@@ -175,8 +183,9 @@ class BaseProtocol(serialBytesProtocol):
                 del self.requests[info['frame_id']]
             else:
                 self.log.warn('Response without request: %r' % info)
-        elif self.callback:
-            self.callback(info)
+        elif self.callbacks:
+            for callback in self.callbacks:
+                callback(info)
         else:
             self.log.debug(info)
 

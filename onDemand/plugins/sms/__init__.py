@@ -5,7 +5,7 @@ import re
 from twisted.internet import reactor, defer
 from twisted.internet.protocol import ClientFactory
 from twisted.logger import Logger
-from onDemand.protocols.serial import serialProtocol, serialEndPoint
+from onDemand.protocols.serial import serialLineProtocol, serialEndPoint
 from onDemand.plugins import Client
 
 
@@ -15,7 +15,7 @@ class SmsFactory(ClientFactory, Client):
     actions = ('sendsms, readsms')
     
     def __init__(self, event_fct=None):
-        self.protocol = serialProtocol()
+        self.protocol = serialLineProtocol()
         self.uid = uuid.uuid4()
         self.protocol.factory = self
         self.log = Logger()

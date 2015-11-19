@@ -60,10 +60,12 @@ class Frame(object):
         be 0xFF.
         """
         total = 0
-
         # Add together all bytes
         for byte in self.data:
             total += byteToInt(byte)
+            
+        #  total += byteToInt(self.data[-1])
+        
 
         # Only keep low bits
         total &= 0xFF
@@ -140,20 +142,19 @@ class Frame(object):
         self.raw_data += intToByte(byteToInt(byte))
 
     def remaining_bytes(self):
-        #         print(len(self.raw_data))
         remaining = 3
 
         if len(self.raw_data) >= 3:
             # First two bytes are the length of the data
             raw_len = self.raw_data[0:2]
-#             print('raw_len: %r' % raw_len)
+            #  print('raw_len: %r' % raw_len)
             data_len = struct.unpack("> h", raw_len)[0]
 #             print('data_len: %d' % data_len)
 
             remaining += data_len
 
             # Don't forget the checksum
-#             remaining += 1
+            #  remaining += 1
 
         return remaining - len(self.raw_data)
 
