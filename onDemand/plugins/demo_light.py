@@ -41,8 +41,8 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
                 self.proto.remote_at(dest_addr_long=self.long_address,
                                      command=b'D%d' % self._pin,
                                      parameter=b'\x04')
-#             self.status = value
-#             self.event(value, 'status')
+            self.status = value
+            self.event(value, 'status')
 
     def r_get_target(self):
         return self.status
