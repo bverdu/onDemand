@@ -38,3 +38,16 @@ body {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
+
+@font-face {
+  font-family: 'BrunoAce-Regular';
+  src: url('../fonts/BrunoAce-Regular.eot');
+  src: url('../fonts/BrunoAce-Regular.eot?#iefix') format('embedded-opentype'),
+       url('../fonts/BrunoAce-Regular.woff') format('woff'),
+       url('../fonts/BrunoAce-Regular.ttf') format('truetype'),
+       url('../fonts/BrunoAce-Regular.svg#BrunoAce-Regular') format('svg');
+}
+
+.fontpro,.fontpro-35264 {
+  font-family: 'BrunoAce-Regular',sans-serif;
+}

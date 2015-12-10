@@ -1,3 +1,15 @@
+var config;
+if (typeof(require) === 'undefined') {
+    /* XXX: Hack to work around r.js's stupid parsing.
+     * We want to save the configuration in a variable so that we can reuse it in
+     * tests/main.js.
+     */
+    require = {
+        config: function (c) {
+            config = c;
+        }
+    };
+}
 require.config({
     baseUrl: '.',
     paths: {
@@ -11,7 +23,7 @@ require.config({
 		"strophe-websocket":    "src/websocket",
         "strophe-polyfill":     "src/polyfills",
         
-        // Plugins
+        // Strophe Plugins
         "strophe.roster":        "scripts/strophe.roster",
         "strophe.disco":         "scripts/strophe.disco",
         "strophe.pubsub":        "scripts/strophe.pubsub",
@@ -19,13 +31,19 @@ require.config({
 
         // JQuery
 		"jquery":		    "bower_components/jquery/dist/jquery",
-        "jquery.soap":      "bower_components/jquery.soap/jquery.soap"
+        
+        // Bootstrap
+        "bootstrap":        "bower_components/bootstrap/dist/js/bootstrap"
+        
+        // Bootstrap Plugins
+        //"bootstrap.toggle":  "bower_components/bootstrap-toggle/js/bootstrap-toggle"
     },
     "shim": {
-        "jquery.soap": ["jquery"],
         "strophe.roster": ["strophe"],
         "strophe.disco": ["strophe"],
-        "strophe.pubsub": ["strophe"]   
+        "strophe.pubsub": ["strophe"],
+        "bootstrap": ["jquery"]
+        //"bootstrap.toggle": ["jquery", "bootstrap"]
         
     }
 });

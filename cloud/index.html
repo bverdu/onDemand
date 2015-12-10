@@ -9,7 +9,7 @@
     <meta name="author" content="">
     <link rel="icon" href="../../favicon.ico">
 
-    <title>LazyTech Signin</title>
+    <title>IoT Demo</title>
 
     <!-- Bootstrap core CSS -->
     <link href="css/bootstrap.min.css" rel="stylesheet">
@@ -20,23 +20,55 @@
   </head>
 
   <body>
-
-    <div class="container">
-
-      <form class="form-signin">
-        <h2 class="form-signin-heading">XmPP credentials</h2>
-        <label for="inputuser" class="sr-only">User</label>
-        <input type="text" id="inputuser" class="form-control" placeholder="XmPP User" required autofocus>
-        <label for="pass" class="sr-only">Password</label>
-        <input type="password" id="pass" class="form-control" placeholder="Password" required>
-        <div class="checkbox">
-          <label>
-            <input type="checkbox" value="remember-me"> Remember me
-          </label>
+      <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-4">
+                <div style="background-color: #40d1e7; border-radius: 50px; align: left; width:300px; height: 90px;">
+                    <a href="http://lazytech.io" title="LazyTech, Ingénierie domotique et de l'Internet des objets">
+                        <img src="logo_small.png" style="width: 90px; height: 90px; display: inline-block; vertical-align: top;">
+                    
+                    <div style="display: inline-block; color: black; margin-bottom:0px; vertical-align: center;">
+                        <p style="margin-top:5px; margin-bottom:0px; margin-left:0px; margin-right:0px; ">
+                            <span style=" font-family:'BrunoAce-Regular'; font-size:20pt; font-weight:600;">Lazy</span>
+                            <span style=" font-family:'BrunoAce-Regular'; font-size:20pt; font-weight:600; color:#ff0000;">T</span>
+                            <span style=" font-family:'BrunoAce-Regular'; font-size:20pt; font-weight:600;">ech</span>
+                        </p>
+                        <p style="font-family:'Liberation Sans'; font-size:12pt; font-weight:600; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; color: grey;" >Connect Everything</p>
+                        <p style="font-family:'Liberation Sans'; font-size:12pt; font-weight:600; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; color: grey;" >Connect Everywhere</p>
+                    </div>
+                        </a>
+                </div>
+            </div>
+            <h1 class="col-md-4 text-center">IoT Demo</h1>
+            <div class="col-md-4">
+				<a href="http://www.spicetronic.com/" title="Spicetronic, conception de produits electroniques sur mesure" ><img src="http://www.spicetronic.com/wp-content/uploads/images/SPheader/spicetronic-logo.png" height=60 />	
+				</a> 
+			</div>
         </div>
-        <button class="btn btn-lg btn-success btn-block" type="button" id='connect' value='connect'>Sign in</button>
-      </form>
-        <div id='log'></div>
+        <form class="form-signin">
+            <div id="credentials">
+                <h2 class="form-signin-heading">Credentials</h2>
+                <label for="inputuser" class="sr-only">User</label>
+                <input type="text" id="inputuser" class="form-control" placeholder="XmPP User" required autofocus />
+                <label for="pass" class="sr-only">Password</label>
+                <input type="password" id="pass" class="form-control" placeholder="Password" required />
+                <div class="checkbox">
+                  <label>
+                    <input type="checkbox" value="remember-me"> Remember me
+                  </label>
+                </div>
+            </div>
+            <button class="btn btn-lg btn-success btn-block" type="button" id='connect' value='connect'>Sign in</button>
+        </form>
+        <div id='objects' class="well row" >
+        </div>
+            <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#logframe" aria-expanded="false" aria-controls="Display log">
+                Log Console
+            </button>
+          <div class="collapse" id="logframe">
+            <div id='log' class="well pre-scrollable" style="background-color:#0d0101; color: green; max-height: 400px; ">
+            </div>
+          </div>
     </div> <!-- /container -->
       <script src="scripts/require.js" data-main="scripts/main.js"></script>
   </body>

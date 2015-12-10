@@ -17,7 +17,7 @@
             factory(
                 Strophe.Strophe,
                 Strophe.$build,
-                Strophe.$iq ,
+                Strophe.$iq,
                 Strophe.$msg,
                 Strophe.$pres
             );

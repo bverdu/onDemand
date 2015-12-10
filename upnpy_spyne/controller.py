@@ -311,7 +311,7 @@ class Controller(service.MultiService):
                     self.xmlstream.send(presence)
             elif resp['type'] == 'unsubscribed':
                 if jid in self.users:
-                    print('subscription failed: %s' % resp['from'])
+                    self.log.warn('subscription failed: %s' % resp['from'])
                 return
         for child in resp.elements():
             if child.name == 'ConfigIdCloud':
@@ -395,10 +395,10 @@ class Controller(service.MultiService):
         if self.messager:
             if isinstance(value, dict):
                 self.messager.callRemote(message_type,
-                                             name=name,
-                                             id_=id_,
-                                             value=json.dumps(value))
-                
+                                         name=name,
+                                         id_=id_,
+                                         value=json.dumps(value))
+
 #                 for v in value.iteritems():
 #                     if not v or isinstance(v, dict):
 #                         print('zap')
