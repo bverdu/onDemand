@@ -18,7 +18,7 @@ from onDemand.utils import Timer, \
     mpdtime_to_upnptime, \
     upnptime_to_mpdtime, \
     get_default_v4_address
-from playlst import Playlist
+from playlist import Playlist
 from onDemand.plugins import Client
 
 log = Logger(namespace='protocol.mpd')
