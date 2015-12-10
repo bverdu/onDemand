@@ -68,7 +68,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
                     self.r_set_status(sample[self.pin])
 
 
-def get_Demo_light(device=b'/dev/ttyACM0', pin=0, api_level=1,
+def get_Demo_switch(device=b'/dev/ttyACM0', pin=0, api_level=1,
                    long_address=b'\x00\x00\x00\x00\x00\x00\xFF\xFF',
                    address=b'\xFF\xFE', net_type='lan', **kwargs):
     from twisted.internet import reactor
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     observers = [textFileLogObserver(sys.stdout)]
     globalLogBeginner.beginLoggingTo(observers)
 
-    e, f = get_Demo_light(pin=2, api_level=2, baudrate=57600)
+    e, f = get_Demo_switch(pin=2, api_level=2, baudrate=57600)
 
     def test():
         if f.proto.connected:
