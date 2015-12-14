@@ -16,7 +16,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
 
     def __init__(self, long_address=b'\x00\x00\x00\x00\x00\x00\xFF\xFF',
                  address=b'\xFF\xFE', pin=0,
-                 api_level=1, net_type=None):
+                 api_level=1, net_type=None, stateless=True):
         self.long_address = long_address
         self.address = address
         self._pin = pin
@@ -25,6 +25,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
         self.proto = None
         self.log = Logger()
         self.callback = self.receive
+        self.stateless = stateless
 
     '''
     Remote functions
@@ -41,8 +42,10 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
                 self.proto.remote_at(dest_addr_long=self.long_address,
                                      command=b'D%d' % self._pin,
                                      parameter=b'\x04')
-            self.status = value
-            self.event(value, 'status')
+                
+            if self.stateless:
+                self.status = value
+                self.event(value, 'status')
 
     def r_get_target(self):
         return self.status
@@ -50,7 +53,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
     def r_get_status(self):
         return self.status
 
-    def r_set_status(self, status):
+    def set_status(self, status):
         if status is not self.status:
             self.log.debug('%r --> %s' % (self.long_address,
                                           'jour!' if status else 'nuit!'))
@@ -61,19 +64,19 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
         if 'samples' in data:
             for sample in data['samples']:
                 if self.pin in sample:
-                    self.r_set_status(sample[self.pin])
+                    self.set_status(sample[self.pin])
         elif 'parameter' in data:
             for sample in data['parameter']:
                 if self.pin in sample:
-                    self.r_set_status(sample[self.pin])
+                    self.set_status(sample[self.pin])
 
 
 def get_Demo_light(device=b'/dev/ttyACM0', pin=0, api_level=1,
                    long_address=b'\x00\x00\x00\x00\x00\x00\xFF\xFF',
-                   address=b'\xFF\xFE', net_type='lan', **kwargs):
+                   address=b'\xFF\xFE', net_type='lan',  stateless=True, **kwargs):
     from twisted.internet import reactor
     from twisted.internet.serialport import SerialPort
-    f = Demo_light_factory(long_address, address, pin, net_type)
+    f = Demo_light_factory(long_address, address, pin, net_type, stateless)
     endpoint = ZigBee(callback=f.receive,
                       escaped=True if (api_level > 1) else False)
     f.proto = endpoint

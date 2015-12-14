@@ -231,7 +231,7 @@ define(function (require) {
         var frame = $("<div></div>")
             .attr('id', dev.UDN)
             .addClass('col-md-12 bg-info pre-scrollable')
-            .css({"padding":"5px","border-radius":"8px", "overflow-y": "auto"})
+            .css({"padding":"5px","border-radius":"8px", "overflow-y": "auto", "margin-top": "10px"})
             .append(name);
         for (var service in dev.services){
             frame.append("<hr>") ;
