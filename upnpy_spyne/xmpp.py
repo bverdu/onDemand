@@ -70,8 +70,8 @@ class XmppService(Service):
             self.services.update(
                 {str(service.serviceId):
                     {'app': TwistedXMPPApp(service.app), 'svc': service}})
-            print('name: %s, methods: %s' %
-                  (device.name, service.app.interface.service_method_map))
+#             print('name: %s, methods: %s' %
+#                   (device.name, service.app.interface.service_method_map))
             for var in service.stateVariables.values():
                 if var.sendEvents:
                     self.nodes.append(
@@ -116,7 +116,7 @@ class XmppService(Service):
 
     def disconnected(self, xs):
 
-        print 'Disconnected.'
+        self.log.debug('%s disconnected.' % self._jid)
 
 #         self.finished.callback(None)
 
@@ -138,9 +138,9 @@ class XmppService(Service):
         disco = IQ(xs, 'get')
         disco.addElement(('http://jabber.org/protocol/disco#info', 'query'))
         disco.addCallback(self.check_server)
-        disco.send(to='pubsub.xmpp.bertrandverdu.me')
+        disco.send(to='pubsub.' + self.jid.host)
         self.check_ps_nodes()
-        self.reactor.callLater(30, self.ping)
+        self.reactor.callLater(120, self.ping)
 
     def ping(self):
 
@@ -148,7 +148,7 @@ class XmppService(Service):
             if res['type'] == 'result':
                 #                 log.debug('pong !')
                 self.timeout = False
-                self.reactor.callLater(30, self.ping)
+                self.reactor.callLater(120, self.ping)
             else:
                 self.log.error('ping error: %s' % res.toXml())
                 self.timeout = False
@@ -247,7 +247,7 @@ class XmppService(Service):
                     'pubsub.' + self.jid.host)
                 node[2].subscribe(event, 100)
                 self.reactor.callLater(
-                    95, self.renew_subscription, *(node_name, node))
+                    99, self.renew_subscription, *(node_name, node))
             else:
                 self.log.error('unknown response from server: %s' %
                                response.toXml())
@@ -313,6 +313,10 @@ class XmppService(Service):
         last['var'] = 'pubsub#send_last_published_item'
         last.addElement('value', content='on_sub_and_presence')
         x.addChild(last)
+        numitems = domish.Element((None, 'field'))
+        numitems['var'] = 'pubsub#max_items'
+        numitems.addElement('value', content='1')
+        x.addChild(numitems)
         configure.addChild(x)
         ps.addChild(configure)
         iq.addChild(ps)
@@ -335,16 +339,16 @@ class XmppService(Service):
         iq.send(to='pubsub.' + self.jid.host)
 
     def renew_subscription(self, name, node):
-        self.log.debug('renew %s : %s' % (name, (name in self.registrations)))
+#         self.log.debug('renew %s : %s' % (name, (name in self.registrations)))
         if name in self.registrations:
             self.log.debug('renew: %s' % name)
             event = XmppEvent(
                 name,
                 self,
                 'pubsub.' + self.jid.host)
-            node[2].subscribe(event, 100)
+            node[2].subscribe(event, 100, True)
             self.reactor.callLater(
-                95, self.renew_subscription, *(name, node))
+                99, self.renew_subscription, *(name, node))
 
     def on_iq(self, iq):
         #         print('received iq: %s' % iq.toXml().encode('utf-8'))

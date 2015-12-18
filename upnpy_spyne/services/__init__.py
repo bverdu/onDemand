@@ -221,7 +221,7 @@ class Service(object):
             raise Exception()
         return result
 
-    def subscribe(self, callback, timeout):
+    def subscribe(self, callback, timeout, renew=False):
         sid = 'uuid:' + self._generate_subscription_sid()
 #         if isinstance(callback, str):
 #             sid = 'uuid:' + self._generate_subscription_sid()
@@ -241,8 +241,9 @@ class Service(object):
 
         subscription = EventSubscription(sid, callback, timeout)
 
-        for prop in self.event_properties.values():
-            subscription.notify(prop)
+        if not renew:
+            for prop in self.event_properties.values():
+                subscription.notify(prop)
         if callback:
             if sid in self.subscriptions:
                 self.subscriptions[sid].append(subscription)

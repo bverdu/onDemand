@@ -213,7 +213,7 @@ define(function (require) {
     Device.prototype.build_dom = function (dom_element) {
         if (this.deviceType === "urn:schemas-upnp-org:device:BinaryLight:1") {
             //build_binaryLight(this, dom_element);
-            log('Light !');
+            //log('Light !');
             build_genericDevice(this, dom_element);
         }
         else {
@@ -248,7 +248,7 @@ define(function (require) {
                         event = false;
                     for (var i = 0; i< inpts.length; i++) {
                         for (var n in inpts[i]){
-                            log("event: " + inpts[i][n]);
+                            //log("event: " + inpts[i][n]);
                             //act.append($("<span></span>").text(n));
                             //console.log(dev.services[service].events);
                             if (inpts[i][n] in dev.services[service].events) {
@@ -496,12 +496,14 @@ define(function (require) {
     function handle_boolean_event(off_input, on_input) {
         return function(value) {
             if (isTrue(value)) {
+                log('Event True');
                 $("#" + on_input).removeClass('btn-default');
                 $("#" + on_input).addClass('btn-primary');
                 $("#" + off_input).removeClass('btn-primary');
                 $("#" + off_input).addClass('btn-default');
             }
             else {
+                log('Event False');
                 $("#" + off_input).removeClass('btn-default');
                 $("#" + off_input).addClass('btn-primary');
                 $("#" + on_input).removeClass('btn-primary');
@@ -541,13 +543,32 @@ define(function (require) {
             /*for (field in fields) {
                 $('#' + fields[field]).val('test');
             }*/
-            console.log(res);
+            //console.log(res);
+    }
+    function process_event(eventitems) {
+        var nodename = eventitems.attr('node');
+        console.log(eventitems);
+        var item = eventitems.find('item').first();
+        item.find('property').each(function () {
+            for (var i=0; i < subscriptions[nodename].length; i++){
+                if (this.firstChild.firstChild != null) {
+                    subscriptions[nodename][i](this.firstChild.firstChild.nodeValue);
+                    log(nodename + ' --> ' + this.firstChild.firstChild.nodeValue);
+                    }
+            }
+        });
+        
     }
     function process_events(events){
-        //console.log(events);
+        console.log(events);
+        events.each(function () {
+            process_event($(this).find('items').first());
+        })
+        /*
         for (var i=0; i < events.length; i++){
             //console.log(events[i]);
-            items = events[i].childNodes[0];
+            process_event(events[i].find('items').first);
+            items = $(events[i]).find('items').first;
             if (items.getAttribute('node') in subscriptions){
                 var n = items.getAttribute('node');
                 //log(n);
@@ -556,7 +577,7 @@ define(function (require) {
                     for (var k = 0; k < properties.length; k++){
                         /*console.log(subscriptions[n]);
                         console.log(properties[k].
-                                    firstChild.firstChild.nodeValue);*/
+                                    firstChild.firstChild.nodeValue);
                         if (properties[k].firstChild.firstChild != null){
                             for (var l = 0; l<  subscriptions[n].length; l++) {
                                 subscriptions[n][l](properties[k].
@@ -567,11 +588,24 @@ define(function (require) {
                 }
                     
             }
-        }
+        }*/
     }
     function subscribed (node, clbk) {
         return function (iq){
-            subscriptions[node] = clbk;
+            if (iq.getAttribute('type') === 'result') {
+                subscriptions[node] = clbk;
+                var last = $iq({type: 'get', to: iq.getAttribute('from')})
+                    .c('pubsub', {xmlns: 'http://jabber.org/protocol/pubsub'})
+                    .c('items', {node: node, max_items: '1'});
+                //connection.sendIQ(last, function (res) {console.log($(res).find('items').last()); });
+                log('get: ' + node);
+                connection.sendIQ(last, function (res) {process_event($(res).find('items').last());});
+                
+            }
+            else {
+                log('error subscribing ' + node);
+            }
+            
             //console.log('subscribed: ' + node);
             //console.log(iq);
         }
@@ -616,9 +650,10 @@ define(function (require) {
     }
     
     function onMsg(message) {
-        //console.log('got MESSAGE: ');
-        //console.log(message);
-        var events = message.getElementsByTagName('event')
+        /*console.log('got MESSAGE: ');
+        console.log(message);*/
+        var events = $(message).find('event');
+        //var events = message.getElementsByTagName('event')
         if (events.length > 0){
             process_events(events);
         }

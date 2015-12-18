@@ -25,7 +25,7 @@ require.config({
         
         // Strophe
         
-        "strophe":              "scripts/strophe.min",
+        "strophe":              "scripts/strophe",
         
         // Strophe Plugins
         "strophe.roster":       "scripts/strophe.roster",
