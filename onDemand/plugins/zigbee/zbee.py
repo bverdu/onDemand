@@ -185,21 +185,25 @@ class ZigBee(BaseProtocol):
                               original))])])
     }
 
-    def connectionMade(self):
-        def got_info(data):
-            for callback in self.callbacks:
-                callback(data)
-        d = self.remote_at(
-            dest_addr_long=b'\x00\x00\x00\x00\x00\x00\xFF\xFF', command=b'IS')
-        d.addCallback(got_info)
+#     def connectionMade(self):
+#         def got_info(data):
+#             for callback in self.callbacks:
+#                 callback(data)
+#         d = self.remote_at(
+#             dest_addr_long=b'\x00\x00\x00\x00\x00\x00\xFF\xFF', command=b'IS')
+#         d.addCallback(got_info)
 
     def connect(self, f):
-        if f.callback:
-            self.callbacks.append(f.callback)
-            d = self.remote_at(
-                dest_addr_long=f.long_address, command=b'IS')
-            d.addCallback(f.callback)
-        f.proto = self
+        if self.connected:
+            if f.callback:
+                self.callbacks.append(f.callback)
+                d = self.remote_at(
+                    dest_addr_long=f.long_address, command=b'IS')
+                d.addCallback(f.callback)
+            f.proto = self
+        else:
+            from twisted.internet import reactor
+            reactor.callLater(1, self.connect, f)  # @UndefinedVariable
 
     def _parse_IS_at_response(self, packet_info):
         """

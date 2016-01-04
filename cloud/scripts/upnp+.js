@@ -7,7 +7,7 @@ define(function (require) {
         $iq = strophe.$iq,
         $msg = strophe.$msg,
         $build = strophe.$build,
-        //soap_string = require('jquery.soap_string'),
+        b64_sha1 = strophe.SHA1.b64_sha1,
         BOSH_SERVICE = 'http://bosh.metajack.im:5280/xmpp-httpbind',
         uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
             /[xy]/g,
@@ -23,7 +23,19 @@ define(function (require) {
         subscriptions = {},
         service_id = 0,
         rindex = 0, 
-        devices = [];
+        devices = [],
+        identity = { category: 'client', name: 'LazyTech_Demo', type: 'web' },
+        features = [
+                "http://jabber.org/protocol/caps",
+		        "http://jabber.org/protocol/disco#info", 
+		        "http://jabber.org/protocol/disco#items"
+            ],
+        my_ver = b64_sha1(features.join()),
+        /* PEP constants */
+        NS_CAPS = "http://jabber.org/protocol/caps",
+        NS_DISCO_INFO = "http://jabber.org/protocol/disco#info",
+        NS_PUBSUB = "http://jabber.org/protocol/pubsub",
+        NS_PUBSUB_EVENT = NS_PUBSUB + "#event";
         
 
     function log(msg) {
@@ -229,7 +241,6 @@ define(function (require) {
             .addClass('text-center')
             .append(document.createTextNode(dev.friendlyName)) ;
         var frame = $("<div></div>")
-            .attr('id', dev.UDN)
             .addClass('col-md-12 bg-info pre-scrollable')
             .css({"padding":"5px","border-radius":"8px", "overflow-y": "auto", "margin-top": "10px"})
             .append(name);
@@ -268,12 +279,12 @@ define(function (require) {
                                     }
                                     rindex += 2;
                                     if (event){
-                                        log('registering ' + event + 'for' + action);
+                                        log('registering input ' + event + ' for ' + action);
                                         dev.services[service]
                                             .events[event].push(handle_boolean_event(
                                                 action + rindex.toString(),
                                                 action + (rindex + 1).toString()))
-                                        start_class = " btn-default"
+                                        start_class = "btn-default"
                                     }
                                     
                                     inpt.append($("<div></div>")
@@ -297,7 +308,7 @@ define(function (require) {
                                                 .append($("<div></div>")
                                                         .addClass("btn-group")
                                                         .append($("<button></button>")
-                                                            .addClass("btn remote" + start_class)
+                                                            .addClass("col-md-6 btn remote " + start_class)
                                                             .attr({type: "button",
                                                                   "id": action + (rindex +1).toString(),
                                                                   param: 'no'})
@@ -374,11 +385,11 @@ define(function (require) {
                                     boo = true;
                                 }
                                 if (event) {
-                                    log('registering ' + event + 'for' + action);
+                                    log('registering output ' + event + ' for ' + action);
                                     if (boo){
                                         dev.services[service].events[event]
                                         .push(handle_boolean_event(action + service_id.toString(),
-                                                                  action + (service_id +1).toString()))
+                                                                  action + (service_id + 1).toString()));
                                     }
                                     else {
                                         dev.services[service].events[event]
@@ -400,13 +411,15 @@ define(function (require) {
                                                                 "col-md-6 btn btn-primary")
                                                             .attr({"id": action + service_id
                                                                    .toString()})
+                                                            .prop('disabled', true)
                                                             .text('Off')))
                                                 .append($("<div></div>")
                                                         .addClass("btn-group")
                                                         .append($("<button></button>")
-                                                            .addClass("btn btn-default")
+                                                            .addClass("col-md-6 btn btn-default")
                                                             .attr({"id": action + (
                                                                 service_id +1).toString()})
+                                                            .prop('disabled', true)
                                                             .text('On')))));
                                     service_id++;
                                     
@@ -438,8 +451,11 @@ define(function (require) {
                 frame.append(act.append(inpt).append(outpt));
             } 
         }
-            
-        dom_element.append($("<div></div>").addClass("col-md-4").append(frame));
+        var uid_str = dev.UDN.split(':');
+        dom_element.append($("<div></div>")
+                           .addClass("col-md-4")
+                           .attr('id', uid_str[uid_str.length -1])
+                           .append(frame));
     }
     
     function build_binaryLight(dev, dom_element) {
@@ -454,6 +470,20 @@ define(function (require) {
             from = presence.getAttribute('from'),
             res_name = Strophe.getResourceFromJid(from);
         log('got PRESENCE from:  ' + from);
+        if (presence.hasAttribute('type')) {
+            log('type = ' + presence.getAttribute('type'));
+            if (presence.getAttribute('type') === 'unavailable') {
+                console.log(res_name);
+                console.log(devices);
+                console.log(devices.indexOf(res_name));
+                if (devices.indexOf(res_name) != -1) {
+                    var str_array = res_name.split(':');
+                    log('goodbye ' + str_array[str_array.length - 1]);
+                    $('#' + str_array[str_array.length - 1]).remove();
+                    
+                }
+            }
+        }
         if (elems.length > 0) {
             /*for (l = 0; index < devices.length; l++) {
                 if (devices[l] === from){
@@ -461,6 +491,7 @@ define(function (require) {
                 }
             }*/
             log('Discovered:  ' + res_name);
+            devices.push(res_name);
             var iq = $iq({ to: presence.getAttribute('from'), type: 'get'}).c(
                     'query',
                     { xmlns: "urn:schemas-upnp-org:cloud-1-0",
@@ -491,28 +522,36 @@ define(function (require) {
     function handle_event(field) {
         return function(value) {
             $('#' + field).val(value);
+            console.log('txt');
         }
     }
     function handle_boolean_event(off_input, on_input) {
+        var _on = "#" + on_input;
+        var _off = "#" + off_input;
         return function(value) {
             if (isTrue(value)) {
-                log('Event True');
-                $("#" + on_input).removeClass('btn-default');
-                $("#" + on_input).addClass('btn-primary');
-                $("#" + off_input).removeClass('btn-primary');
-                $("#" + off_input).addClass('btn-default');
+                log('True');
+                $(_on).removeClass('btn-default');
+                $(_on).addClass('btn-primary');
+                $(_off).removeClass('btn-primary');
+                $(_off).addClass('btn-default');
             }
             else {
-                log('Event False');
-                $("#" + off_input).removeClass('btn-default');
-                $("#" + off_input).addClass('btn-primary');
-                $("#" + on_input).removeClass('btn-primary');
-                $("#" + on_input).addClass('btn-default');
+                log('False');
+                $(_off).removeClass('btn-default');
+                $(_off).addClass('btn-primary');
+                $(_on).removeClass('btn-primary');
+                $(_on).addClass('btn-default');
             }
+            console.log('bool');
         }
     }
     function handle_result(fields) {
         return function (res) {
+            //console.log(res);
+            if (res.childNodes.length < 1){
+                return true;
+            }
             var responses = res.childNodes[0].childNodes[0].childNodes[0].childNodes;
             for (var i = 0; i < responses.length ; i++){
                 log(fields[responses[i].nodeName] + ' --> ' + responses[i].childNodes[0].nodeValue);
@@ -520,6 +559,7 @@ define(function (require) {
                     $("#" + fields[responses[i].nodeName]).val(responses[i].childNodes[0].nodeValue);
                 }
                 else {
+                    console.log('yyyy');
                     var _off = "#" + fields[responses[i].nodeName]
                     var _on = _off.slice(0, _off.length - 1)
                         + (Number(_off[_off.length - 1]) + 1).toString();
@@ -547,7 +587,7 @@ define(function (require) {
     }
     function process_event(eventitems) {
         var nodename = eventitems.attr('node');
-        console.log(eventitems);
+        //console.log(eventitems);
         var item = eventitems.find('item').first();
         item.find('property').each(function () {
             for (var i=0; i < subscriptions[nodename].length; i++){
@@ -560,54 +600,19 @@ define(function (require) {
         
     }
     function process_events(events){
-        console.log(events);
+        //console.log(events);
         events.each(function () {
             process_event($(this).find('items').first());
         })
-        /*
-        for (var i=0; i < events.length; i++){
-            //console.log(events[i]);
-            process_event(events[i].find('items').first);
-            items = $(events[i]).find('items').first;
-            if (items.getAttribute('node') in subscriptions){
-                var n = items.getAttribute('node');
-                //log(n);
-                for (var j=0; j < items.childNodes.length; j++){
-                    var properties = items.childNodes[j].childNodes[0].childNodes
-                    for (var k = 0; k < properties.length; k++){
-                        /*console.log(subscriptions[n]);
-                        console.log(properties[k].
-                                    firstChild.firstChild.nodeValue);
-                        if (properties[k].firstChild.firstChild != null){
-                            for (var l = 0; l<  subscriptions[n].length; l++) {
-                                subscriptions[n][l](properties[k].
-                                    firstChild.firstChild.nodeValue);
-                            }
-                        }
-                    }
-                }
-                    
-            }
-        }*/
     }
     function subscribed (node, clbk) {
         return function (iq){
             if (iq.getAttribute('type') === 'result') {
                 subscriptions[node] = clbk;
-                var last = $iq({type: 'get', to: iq.getAttribute('from')})
-                    .c('pubsub', {xmlns: 'http://jabber.org/protocol/pubsub'})
-                    .c('items', {node: node, max_items: '1'});
-                //connection.sendIQ(last, function (res) {console.log($(res).find('items').last()); });
-                log('get: ' + node);
-                connection.sendIQ(last, function (res) {process_event($(res).find('items').last());});
-                
             }
             else {
                 log('error subscribing ' + node);
             }
-            
-            //console.log('subscribed: ' + node);
-            //console.log(iq);
         }
         
     }
@@ -622,24 +627,27 @@ define(function (require) {
         var device = new Device(desc.getAttribute('from'), desc);
         //console.log(device);
         for (var s in device.events){
-            for (var evt in device.events[s]){
-                /*log('subscribing: ' + [desc.getAttribute('from'),
-                                       s,
-                                       evt].join("/"));*/
+            for (var evt in device.events[s]) {
+                features.push([desc.getAttribute('from'),  s, evt].join("/"));
+                features.push([desc.getAttribute('from'),  s, evt].join("/")+"+notify");
+                subscriptions[[desc.getAttribute('from'),  s, evt].join("/")] = device.events[s][evt];
+            }
+        my_ver = b64_sha1(features.join());
+        connection.send($pres().c('c',
+                               {xmlns: NS_CAPS, hash: 'sha-1',
+                                node: 'https://lazytech.io', ver: my_ver}));
+            /*for (var evt in device.events[s]){
                 subscribe('pubsub.' + Strophe.getDomainFromJid(
                     desc.getAttribute('from')),
                     [desc.getAttribute('from'),  s, evt].join("/"),
                     device.events[s][evt]);
-            }
+            }*/
         }
-        devices.push(device);
         var serv = {};
         for (svc in device.services) {
             serv = device.services[svc];
             break;
         } 
-        log('Test UPNP: ' + UpnpControl('test', serv, 'SetTarget', {'Value': '1'}))
-
     }
     
     function onIq(iq) {
@@ -649,11 +657,33 @@ define(function (require) {
         return true;
     }
     
-    function onMsg(message) {
-        /*console.log('got MESSAGE: ');
-        console.log(message);*/
+    function onDisco(iq) {
+        log('Disco Time!');
+        console.log(iq);
+        var response = $iq({type: 'result', id: iq.getAttribute('id')})
+            .c('query', {xmlns: NS_DISCO_INFO, node: ('https://lazytech.io' + '#' + my_ver)})
+            .c('identity', identity)
+            .up();
+        for(var i = 0; i < features.length; i++){
+            response.c('feature', {var: features[i]}).up();
+        }
+        if(iq.hasAttribute("from")){
+            response.up().attrs({to: iq.getAttribute("from")});
+        }
+        connection.send(response);
+        return true;
+    }
+    function onEvent(message) {
         var events = $(message).find('event');
-        //var events = message.getElementsByTagName('event')
+        if (events.length > 0){
+            process_events(events);
+        }
+        console.log('event processed');
+        return true;
+    }
+    
+    function onMsg(message) {
+        var events = $(message).find('event');
         if (events.length > 0){
             process_events(events);
         }
@@ -665,12 +695,6 @@ define(function (require) {
         var from = iq.getAttribute('from');
         var type = iq.getAttribute('type');
         var elems = iq.getElementsByTagName('query');
-        //log('type: ' + type)
-        /*if (type === 'result'){
-            for (e in elems){
-                log('element: ' + Strophe.getText(e));
-            };
-        }*/
         return true;
     }
 
@@ -717,16 +741,22 @@ define(function (require) {
             $('#connect').get(0).value = 'disconnect';
             $('#connect').get(0).firstChild.data = "Sign Out";
             connection.addHandler(onPresence, null, 'presence', null, null, null);
-            connection.addHandler(onIq, null, 'iq', null, null, null);
-            connection.addHandler(onMsg, null, 'message', null, null, null);
+            //connection.addHandler(onIq, null, 'iq', null, null, null);
+            //connection.addHandler(onMsg, null, 'message', null, null, null);
+            connection.addHandler(onEvent, NS_PUBSUB_EVENT, 'message', null, null, null);
+            connection.addHandler(onDisco, NS_DISCO_INFO, "iq", "get", null, null, null);
             //log('send Presence: ' + Strophe.$pres().tree().attributes[0]);
             log('Sending Presence...');
             //connection.send(Strophe.$pres().tree());
-            connection.send($pres().tree());
+            connection.send($pres()
+                            .c('c',
+                               {xmlns: NS_CAPS, hash: 'sha-1',
+                                node: 'https://lazytech.io', ver: my_ver }));
+            
             //var iq = Strophe.$iq(
-            var iq = $iq(
+            /*var iq = $iq(
                 {to: userjid, 'type': 'get'}).c('query', { xmlns: Strophe.NS.DISCO_ITEMS });
-            connection.sendIQ(iq, discovered);
+            connection.sendIQ(iq, discovered);*/
             //connection.disconnect();
         }
     }
@@ -763,14 +793,14 @@ define(function (require) {
         connection = new Strophe.Connection(BOSH_SERVICE);
         /*connection.rawInput = rawInput;
         connection.rawOutput = rawOutput;*/
-        //connection.onPresence = onPresence;
         $('#connect').bind('click', function () {
             var button = $('#connect').get(0), text = button.firstChild;
             if (button.value === 'connect') {
                 /*button.value = 'disconnect';
                 text.data = 'Sign Off';*/
-                userjid = $('#inputuser').get(0).value
-                fulljid = userjid + "/urn:schemas-upnp-org:cloud-1-0:ControlPoint:1:uuid:" + uuid
+                userjid = $('#inputuser').get(0).value;
+                fulljid = userjid + "/urn:schemas-upnp-org:cloud-1-0:ControlPoint:1:uuid:" + uuid;
+                log('My Full JID is ' + fulljid);
                 connection.connect(fulljid, $('#pass').get(0).value, onConnect);
             } else {
                 /*button.value = 'connect';

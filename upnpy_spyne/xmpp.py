@@ -32,7 +32,8 @@ class XmppService(Service):
     active_controllers = []
 
     def __init__(self, device, user='test@xmpp.example.com',
-                 secret='password', userlist=[], web_server=None):
+                 secret='password', userlist=[], web_server=None, pep=True):
+        self.pep = pep
         self.log = Logger()
         self.description = None
         self.reactor = reactor
@@ -53,25 +54,9 @@ class XmppService(Service):
         self.device = device
         device.parent = self
         for service in device.services:
-            #             if appreg.get_application(service.tns, service.name):
-            #                 name = service.name + '_'
-            #             else:
-            #                 name = service.name
-            #             soap_service = type(
-            #                 service.name, (ServiceBase,), service.soap_functions)
-            #             soap_service.tns = service.tns
-            #             app = Application(
-            #                 [soap_service],
-            #                 tns=soap_service.tns,
-            #                 in_protocol=Soap11(xml_declaration=False),
-            #                 out_protocol=Soap11(xml_declaration=False),
-            #                 name=name)
-            #             app.event_manager.add_listener('method_call', _map_context)
             self.services.update(
                 {str(service.serviceId):
                     {'app': TwistedXMPPApp(service.app), 'svc': service}})
-#             print('name: %s, methods: %s' %
-#                   (device.name, service.app.interface.service_method_map))
             for var in service.stateVariables.values():
                 if var.sendEvents:
                     self.nodes.append(
@@ -85,13 +70,7 @@ class XmppService(Service):
         f.addBootstrap(xmlstream.STREAM_END_EVENT, self.disconnected)
         f.addBootstrap(xmlstream.STREAM_AUTHD_EVENT, self.authenticated)
         f.addBootstrap(xmlstream.INIT_FAILED_EVENT, self.init_failed)
-#         self.get_device_info(device)
         self.finished = defer.Deferred()
-
-#     def get_device_info(self, device):
-#         if len(device.icons) > 0:
-#             icon = device.icons[0]
-#             buf = read(open())
 
     def startService(self):
         self.connector = SRVConnector(
@@ -106,8 +85,6 @@ class XmppService(Service):
         Service.stopService(self)
 
     def connected(self, xs):
-        #  print 'Connected.'
-        #  log.debug('!!!!!!!!!!!!!!!!!!!{app}', app=appreg._applications)
         self.xmlstream = xs
 
         # Log all traffic
@@ -121,7 +98,6 @@ class XmppService(Service):
 #         self.finished.callback(None)
 
     def authenticated(self, xs):
-        #  print "Authenticated."
 
         xs.addObserver('/presence', self.on_presence)
         xs.addObserver('/iq', self.on_iq)
@@ -131,14 +107,15 @@ class XmppService(Service):
             ('urn:schemas-upnp-org:cloud-1-0', 'ConfigIdCloud'))
         uc['hash'] = 'uda'
         uc.addContent('1.0')
-        #  print(uc.toXml())
         presence.addChild(uc)
-        #  print(presence.toXml())
         xs.send(presence)
         disco = IQ(xs, 'get')
         disco.addElement(('http://jabber.org/protocol/disco#info', 'query'))
         disco.addCallback(self.check_server)
-        disco.send(to='pubsub.' + self.jid.host)
+        if self.pep:
+            disco.send(to=self.jid.userhost())
+        else:
+            disco.send(to='pubsub.' + self.jid.host)
         self.check_ps_nodes()
         self.reactor.callLater(120, self.ping)
 
@@ -178,7 +155,7 @@ class XmppService(Service):
     def check_server(self, result):
 
         def display_info(res):
-            return
+            #             return
             e = fromstring(res.toXml())
             dump(e)
         self.log.debug("server checked")
@@ -232,36 +209,57 @@ class XmppService(Service):
 
     def check_ps_nodes(self):
 
-        def got_response(node, response):
-            if response['type'] in ('error', 'cancel'):
-                self.create_ps_node(node)
-            elif response['type'] == 'result':
+        self.log.debug('check {type} nodes: {nodes}',
+                       type='pep' if self.pep else 'classic',
+                       nodes=str(self.nodes))
+        if self.pep:
+            for node in self.nodes:
                 node_name = '/'.join((self._jid, node[1]))
+                print(self.registrations)
+                self.log.debug(node_name)
                 if node_name in self.registrations:
-                    return
+                    self.log.debug('already registered: %s' % node_name)
+                    continue
                 self.registrations.append(node_name)
+                print(self.registrations)
                 self.log.debug('node {name} registered', name=node_name)
                 event = XmppEvent(
                     node_name,
                     self,
-                    'pubsub.' + self.jid.host)
+                    None)
                 node[2].subscribe(event, 100)
                 self.reactor.callLater(
                     99, self.renew_subscription, *(node_name, node))
-            else:
-                self.log.error('unknown response from server: %s' %
-                               response.toXml())
-        self.log.debug('check nodes: {nodes}', nodes=str(self.nodes))
-        IQ_ = IQ  # Basic optimisation...
-        element = domish.Element
-        for node in self.nodes:
-            iq = IQ_(self.xmlstream, 'get')
-            query = element((
-                'http://jabber.org/protocol/disco#info', 'query'))
-            query['node'] = '/'.join((self._jid, node[1], node[0].name))
-            iq.addChild(query)
-            iq.addCallback(got_response, node)
-            iq.send(to='pubsub.' + self.jid.host)
+        else:
+            def got_response(node, response):
+                if response['type'] in ('error', 'cancel'):
+                    self.create_ps_node(node)
+                elif response['type'] == 'result':
+                    node_name = '/'.join((self._jid, node[1]))
+                    if node_name in self.registrations:
+                        return
+                    self.registrations.append(node_name)
+                    self.log.debug('node {name} registered', name=node_name)
+                    event = XmppEvent(
+                        node_name,
+                        self,
+                        'pubsub.' + self.jid.host)
+                    node[2].subscribe(event, 100)
+                    self.reactor.callLater(
+                        99, self.renew_subscription, *(node_name, node))
+                else:
+                    self.log.error('unknown response from server: %s' %
+                                   response.toXml())
+            IQ_ = IQ  # Basic optimisation...
+            element = domish.Element
+            for node in self.nodes:
+                iq = IQ_(self.xmlstream, 'get')
+                query = element((
+                    'http://jabber.org/protocol/disco#info', 'query'))
+                query['node'] = '/'.join((self._jid, node[1], node[0].name))
+                iq.addChild(query)
+                iq.addCallback(got_response, node)
+                iq.send(to='pubsub.' + self.jid.host)
 
     def create_ps_node(self, node):
 
@@ -276,7 +274,7 @@ class XmppService(Service):
                     'pubsub.' + self.jid.host)
                 node[2].subscribe(event, 100)
                 self.reactor.callLater(
-                    95, self.renew_subscription, *(node_name, node))
+                    99, self.renew_subscription, *(node_name, node))
                 self.registrations.append(node_name)
                 self.log.debug('node {node} registered', node=node_name)
             else:
@@ -339,19 +337,26 @@ class XmppService(Service):
         iq.send(to='pubsub.' + self.jid.host)
 
     def renew_subscription(self, name, node):
-#         self.log.debug('renew %s : %s' % (name, (name in self.registrations)))
+        self.log.debug('renew %s : %s' % (name, (name in self.registrations)))
+        if len(self.active_controllers) < 1:
+            self.registrations = []
+            return
+        print(self.registrations)
         if name in self.registrations:
             self.log.debug('renew: %s' % name)
             event = XmppEvent(
                 name,
                 self,
-                'pubsub.' + self.jid.host)
+                None if self.pep else 'pubsub.' + self.jid.host)
             node[2].subscribe(event, 100, True)
             self.reactor.callLater(
                 99, self.renew_subscription, *(name, node))
 
     def on_iq(self, iq):
         #         print('received iq: %s' % iq.toXml().encode('utf-8'))
+        if not iq.hasAttribute('from'):
+            self.log.debug('no sender from: %s' % iq.toXml())
+            return
         user, host, res = parse(iq['from'])
         del(res)
         if not user:
@@ -422,9 +427,10 @@ class XmppService(Service):
                     if presence['type'] == 'unavailable':
                         return
                 self.log.info('control point %s added' % presence['from'])
-                if len(self.active_controllers) == 0:
-                    self.check_ps_nodes()
                 self.active_controllers.append(presence['from'])
+                if len(self.active_controllers) == 1:
+                    self.check_ps_nodes()
+
             del(res)
             jid = '@'.join((user, host))
             if presence.hasAttribute('type'):

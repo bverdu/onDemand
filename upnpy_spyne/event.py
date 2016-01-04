@@ -282,7 +282,7 @@ class EventSubscription(object):
 
 class XmppEvent(object):
 
-    def __init__(self, nodeId, parent, pubsub_addr):
+    def __init__(self, nodeId, parent, pubsub_addr=None):
         self.log = Logger()
         self.nodeId = nodeId
         self.parent = parent
@@ -292,7 +292,7 @@ class XmppEvent(object):
 
         if len(self.parent.active_controllers) == 0:
             #             self.log.debug('event cancelled')
-            self.parent.registrations = []
+            # self.parent.registrations = []
             return
 
         def success(res):
@@ -300,8 +300,8 @@ class XmppEvent(object):
             if res['type'] == 'error':
                 self.log.error('Publish Event failed :%s' % res.toXml())
             else:
-                if 'Id' in res.children[0].children[0]['node']:
-                    self.log.debug('Event Published: %s' % res.toXml())
+                # if 'Id' in res.children[0].children[0]['node']:
+                self.log.debug('Event Published: %s' % res.toXml())
         name, data = event
         if name == 'Seconds':
             return
@@ -351,4 +351,9 @@ class XmppEvent(object):
         ps.addChild(publish)
         iq.addChild(ps)
         iq.addCallback(success)
-        iq.send(to=self.addr)
+        if self.addr:
+            iq.send(to=self.addr)
+        else:
+            self.log.debug('yo!')
+            self.log.debug(iq.toXml())
+            iq.send()

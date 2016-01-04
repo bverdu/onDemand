@@ -81,7 +81,7 @@ class get_subservices(object):
 
     def get_subservice(self, device, room='Living', house='Home',
                        location='FR/75000', country='France'):
-        log.debug('%s' % device['path'])
+        # log.debug('%s' % device['path'])
         if device['type'] in self.conf.hmodules:
             hwopts = self.conf.hmodules[device['type']]['options']
             module_name = self.conf.hmodules[device['type']]['module']

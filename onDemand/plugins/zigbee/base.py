@@ -230,6 +230,7 @@ class BaseProtocol(serialBytesProtocol):
                 else:
                     data = None
             if dic['len'] and len(data) != dic['len']:
+                print(data)
                 raise ValueError(
                     "The data provided for '%s' was not %d bytes long"
                     % (name, dic['len']))

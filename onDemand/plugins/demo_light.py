@@ -17,7 +17,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
     def __init__(self, long_address=b'\x00\x00\x00\x00\x00\x00\xFF\xFF',
                  address=b'\xFF\xFE', pin=0,
                  api_level=1, net_type=None, stateless=True):
-        self.long_address = long_address
+        self.long_address = long_address.decode('hex')
         self.address = address
         self._pin = pin
         self.pin = 'dio-' + bytes(pin)
@@ -42,7 +42,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
                 self.proto.remote_at(dest_addr_long=self.long_address,
                                      command=b'D%d' % self._pin,
                                      parameter=b'\x04')
-                
+
             if self.stateless:
                 self.status = value
                 self.event(value, 'status')
@@ -79,7 +79,8 @@ def get_Demo_light(device=b'/dev/ttyACM0', pin=0, api_level=1,
     f = Demo_light_factory(long_address, address, pin, net_type, stateless)
     endpoint = ZigBee(callback=f.receive,
                       escaped=True if (api_level > 1) else False)
-    f.proto = endpoint
+    endpoint.connect(f)
+#     f.proto = endpoint
 
     SerialPort(endpoint, device, reactor, **kwargs)
 
