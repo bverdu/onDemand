@@ -35,7 +35,7 @@ require.config({
 
         // JQuery
 		//"jquery":		    "bower_components/jquery/dist/jquery",
-        "jquery":               "scripts/jquery.min",
+        "jquery":               "scripts/jquery_patched",
         
         // Bootstrap
         //"bootstrap":        "bower_components/bootstrap/dist/js/bootstrap"

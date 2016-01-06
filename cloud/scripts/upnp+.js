@@ -22,14 +22,14 @@ define(function (require) {
         fulljid = null,
         subscriptions = {},
         service_id = 0,
-        rindex = 0, 
+        rindex = 0,
         devices = [],
         identity = { category: 'client', name: 'LazyTech_Demo', type: 'web' },
         features = [
-                "http://jabber.org/protocol/caps",
-		        "http://jabber.org/protocol/disco#info", 
-		        "http://jabber.org/protocol/disco#items"
-            ],
+            "http://jabber.org/protocol/caps",
+		    "http://jabber.org/protocol/disco#info",
+		    "http://jabber.org/protocol/disco#items"
+        ],
         my_ver = b64_sha1(features.join()),
         /* PEP constants */
         NS_CAPS = "http://jabber.org/protocol/caps",
@@ -469,28 +469,37 @@ define(function (require) {
         var elems = presence.getElementsByTagName('ConfigIdCloud'),
             from = presence.getAttribute('from'),
             res_name = Strophe.getResourceFromJid(from);
+        if (from === fulljid) {
+            return true;
+        }
         log('got PRESENCE from:  ' + from);
         if (presence.hasAttribute('type')) {
             log('type = ' + presence.getAttribute('type'));
             if (presence.getAttribute('type') === 'unavailable') {
                 console.log(res_name);
                 console.log(devices);
-                console.log(devices.indexOf(res_name));
-                if (devices.indexOf(res_name) != -1) {
+                var pos = devices.indexOf(res_name);
+                console.log(pos);
+                if (pos != -1) {
                     var str_array = res_name.split(':');
                     log('goodbye ' + str_array[str_array.length - 1]);
                     $('#' + str_array[str_array.length - 1]).remove();
-                    
+                    device.splice(pos, 1);
+                return true;
                 }
             }
         }
         if (elems.length > 0) {
+            if (devices.indexOf(res_name) != -1) {
+                log('Already discovered');
+                return true;
+            }
             /*for (l = 0; index < devices.length; l++) {
                 if (devices[l] === from){
                     return true;
                 }
             }*/
-            log('Discovered:  ' + res_name);
+            log('Discovering:  ' + res_name);
             devices.push(res_name);
             var iq = $iq({ to: presence.getAttribute('from'), type: 'get'}).c(
                     'query',
@@ -522,7 +531,7 @@ define(function (require) {
     function handle_event(field) {
         return function(value) {
             $('#' + field).val(value);
-            console.log('txt');
+            //console.log('txt');
         }
     }
     function handle_boolean_event(off_input, on_input) {
@@ -543,7 +552,7 @@ define(function (require) {
                 $(_on).removeClass('btn-primary');
                 $(_on).addClass('btn-default');
             }
-            console.log('bool');
+            //console.log('bool');
         }
     }
     function handle_result(fields) {
@@ -624,9 +633,12 @@ define(function (require) {
     }
     
     function onDescription(desc) {
-        var device = new Device(desc.getAttribute('from'), desc);
-        //console.log(device);
-        for (var s in device.events){
+        console.log("desc:");
+        console.log(desc);
+        log('Discovered: ' + desc.getAttribute('from'));
+        var device = new Device(desc.getAttribute('from'), desc),
+            s = '';
+        for (s in device.events){
             for (var evt in device.events[s]) {
                 features.push([desc.getAttribute('from'),  s, evt].join("/"));
                 features.push([desc.getAttribute('from'),  s, evt].join("/")+"+notify");
@@ -647,13 +659,14 @@ define(function (require) {
         for (svc in device.services) {
             serv = device.services[svc];
             break;
-        } 
+        }
+        return true;
     }
     
     function onIq(iq) {
-        /*log('got IQ');
+        //log('got IQ');
         console.log('got iq');
-        console.log(iq);*/
+        console.log(iq);
         return true;
     }
     
@@ -678,7 +691,7 @@ define(function (require) {
         if (events.length > 0){
             process_events(events);
         }
-        console.log('event processed');
+        //console.log('event processed');
         return true;
     }
     
@@ -733,6 +746,8 @@ define(function (require) {
             $('#connect').get(0).value = 'connect';
             $('#connect').get(0).firstChild.data = "Sign In";
             $('#objects').empty();
+            devices = [];
+            connection = null;
         } else if (status === Strophe.Status.CONNECTED) {
             log('Connected.');
             $('#credentials').addClass('hidden');
@@ -790,7 +805,7 @@ define(function (require) {
     });
     $(document).ready(function () {
         
-        connection = new Strophe.Connection(BOSH_SERVICE);
+        
         /*connection.rawInput = rawInput;
         connection.rawOutput = rawOutput;*/
         $('#connect').bind('click', function () {
@@ -798,6 +813,7 @@ define(function (require) {
             if (button.value === 'connect') {
                 /*button.value = 'disconnect';
                 text.data = 'Sign Off';*/
+                connection = new Strophe.Connection(BOSH_SERVICE);
                 userjid = $('#inputuser').get(0).value;
                 fulljid = userjid + "/urn:schemas-upnp-org:cloud-1-0:ControlPoint:1:uuid:" + uuid;
                 log('My Full JID is ' + fulljid);
