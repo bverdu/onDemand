@@ -30,10 +30,12 @@ class Fake_HE_endpoint(object):
         proto.transport = self
         if clientFactory.addr not in self.clients:
             self.clients.update({clientFactory.addr: proto})
+        clientFactory.doStart()
         if not self.bus:
             r = task.LoopingCall(self.check)
             r.start(20)
-        clientFactory.doStart()
+        else:
+            proto.connectionMade()
         return defer.succeed(None)
 
     def check(self):
@@ -44,7 +46,7 @@ class Fake_HE_endpoint(object):
             self.bus = True
         self.random = not self.random
         l = '162342660' + str(int(self.random))
-        ll = '334455660' + str(int(not self.random))
+        ll = '334455660' + str(int(self.random))
         if l[:-1] in self.clients:
             self.clients[l[:-1]].lineReceived(l)
         if ll[:-1] in self.clients:
