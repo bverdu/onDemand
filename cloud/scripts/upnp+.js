@@ -469,19 +469,24 @@ define(function (require) {
         var elems = presence.getElementsByTagName('ConfigIdCloud'),
             from = presence.getAttribute('from'),
             res_name = Strophe.getResourceFromJid(from);
+        if (res_name === fulljid) {
+            return true;
+        }
         log('got PRESENCE from:  ' + from);
         if (presence.hasAttribute('type')) {
             log('type = ' + presence.getAttribute('type'));
             if (presence.getAttribute('type') === 'unavailable') {
                 console.log(res_name);
                 console.log(devices);
-                console.log(devices.indexOf(res_name));
-                if (devices.indexOf(res_name) != -1) {
+                var pos = devices.indexOf(res_name);
+                console.log(pos);
+                if (pos != -1) {
                     var str_array = res_name.split(':');
                     log('goodbye ' + str_array[str_array.length - 1]);
                     $('#' + str_array[str_array.length - 1]).remove();
-                    
+                    devices.splice(pos, 1);
                 }
+                return true;
             }
         }
         if (elems.length > 0) {
@@ -490,7 +495,11 @@ define(function (require) {
                     return true;
                 }
             }*/
-            log('Discovered:  ' + res_name);
+            if (devices.indexOf(res_name) != -1){
+                log('Already discovered');
+                return true;
+            }
+            log('Discovering:  ' + res_name);
             devices.push(res_name);
             var iq = $iq({ to: presence.getAttribute('from'), type: 'get'}).c(
                     'query',
@@ -625,6 +634,7 @@ define(function (require) {
     
     function onDescription(desc) {
         var device = new Device(desc.getAttribute('from'), desc);
+        log('Discovered: ' + desc.getAttribute('from'));
         //console.log(device);
         for (var s in device.events){
             for (var evt in device.events[s]) {
@@ -643,11 +653,11 @@ define(function (require) {
                     device.events[s][evt]);
             }*/
         }
-        var serv = {};
-        for (svc in device.services) {
-            serv = device.services[svc];
-            break;
-        } 
+//        var serv = {};
+//        for (svc in device.services) {
+//            serv = device.services[svc];
+//            break;
+//        } 
     }
     
     function onIq(iq) {
@@ -733,6 +743,7 @@ define(function (require) {
             $('#connect').get(0).value = 'connect';
             $('#connect').get(0).firstChild.data = "Sign In";
             $('#objects').empty();
+            devices = [];
         } else if (status === Strophe.Status.CONNECTED) {
             log('Connected.');
             $('#credentials').addClass('hidden');
