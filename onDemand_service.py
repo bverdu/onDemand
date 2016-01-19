@@ -18,6 +18,7 @@ It defines classes_and_methods
 '''
 import os
 import sys
+from twisted.scripts.twistd import run
 
 try:
     import _preamble
@@ -44,19 +45,18 @@ try:
 #                     'onDemand']+tmp
     sys.argv[1:] = [l, d, r, reactor,
                     '--nodaemon',
-                    '--pidfile',
-                    ' ',
+                    '--pidfile=',
                     '--originalname',
                     '-n',
-                    'onDemand']+tmp
+                    'onDemand'] + tmp
 except:
-#     sys.argv[1:] = ['-r', 'epoll', '--originalname',
-#                     '-n', 'onDemand'] + sys.argv[1:]
+    #     sys.argv[1:] = ['-r', 'epoll', '--originalname',
+    #                     '-n', 'onDemand'] + sys.argv[1:]
     sys.argv[1:] = ['-r', 'epoll', '--originalname',
                     '--logger', 'onDemand.logger.info',
                     '-n', 'onDemand'] + sys.argv[1:]
 
 # import tracemalloc
 # tracemalloc.start()
-from twisted.scripts.twistd import run
+# from twisted.scripts.twistd import run
 run()

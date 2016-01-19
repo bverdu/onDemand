@@ -1588,7 +1588,7 @@ Strophe = {
 
         var nodeName = elem.nodeName;
         var i, child;
-
+        //console.log(elem);
         if (elem.getAttribute("_realname")) {
             nodeName = elem.getAttribute("_realname");
         }

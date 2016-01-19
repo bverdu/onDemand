@@ -12,6 +12,9 @@ from onDemand.plugins.zigbee import ZigBee
 from onDemand.plugins import Client
 
 
+ENDPOINT = 'zigbee'
+
+
 class Demo_light_factory(ReconnectingClientFactory, Client):
 
     def __init__(self, long_address=b'\x00\x00\x00\x00\x00\x00\xFF\xFF',
