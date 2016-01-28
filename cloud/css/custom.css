@@ -51,3 +51,14 @@ body {
 .fontpro,.fontpro-35264 {
   font-family: 'BrunoAce-Regular',sans-serif;
 }
+
+/*@media screen and (min-width: 768px) {
+  .row-eq-height, .row-eq-height > div[class*='col-'] {  
+      display: -webkit-box;
+      display: -moz-box;
+      display: -ms-flexbox;
+      display: -webkit-flex;
+      display: flex;
+      flex:1 0 auto;
+  }
+}*/

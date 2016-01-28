@@ -15,7 +15,7 @@
     <link href="css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Custom styles for this template -->
-    <link href="css/signin.css" rel="stylesheet">
+    <link href="css/custom.css" rel="stylesheet">
 
   </head>
 
@@ -23,6 +23,10 @@
       <div class="container-fluid">
         <div class="row">
             <div class="col-md-4">
+				<a href="https://lazytech.io/" title="LazyTech, Solutions IoT à la carte" ><img src="img/logo_full_text.png" height=70 />	
+				</a> 
+			</div>
+            <!--<div class="col-md-4">
                 <div style="background-color: #40d1e7; border-radius: 50px; align: left; width:300px; height: 90px;">
                     <a href="http://lazytech.io" title="LazyTech, Ingénierie domotique et de l'Internet des objets">
                         <img src="logo_small.png" style="width: 90px; height: 90px; display: inline-block; vertical-align: top;">
@@ -38,7 +42,7 @@
                     </div>
                         </a>
                 </div>
-            </div>
+            </div> -->
             <h1 class="col-md-4 text-center">IoT Demo</h1>
             <div class="col-md-4">
 				<a href="http://www.spicetronic.com/" title="Spicetronic, conception de produits electroniques sur mesure" ><img src="http://www.spicetronic.com/wp-content/uploads/images/SPheader/spicetronic-logo.png" height=60 />	
@@ -60,7 +64,7 @@
             </div>
             <button class="btn btn-lg btn-success btn-block" type="button" id='connect' value='connect'>Sign in</button>
         </form>
-        <div id='objects' class="well row" >
+        <div id='objects' class="well row row-eq-height" >
         </div>
             <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#logframe" aria-expanded="false" aria-controls="Display log">
                 Log Console

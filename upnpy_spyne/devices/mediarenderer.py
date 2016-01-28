@@ -3,8 +3,7 @@ Created on 10 mai 2015
 
 @author: Bertrand Verdu
 '''
-import uuid
-import socket
+
 from upnpy_spyne.devices import Device
 from upnpy_spyne.services.AVtransport import AVTransport
 from upnpy_spyne.services import Service, get_event_catcher
@@ -12,7 +11,7 @@ from upnpy_spyne.services import Service, get_event_catcher
 
 class MediaRenderer(Device):
 
-    def __init__(self, path, player, datadir):
+    def __init__(self, path, player, datadir, uuid=''):
         Device.__init__(self, path)
         self._description = None
         self.datadir = datadir
@@ -27,8 +26,6 @@ class MediaRenderer(Device):
             "an UPnP Media Renderer"
         self.modelName = "Snap_Media"
         self.version = (1, 0,)
-        self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
         self.avtransport = AVTransport(
             datadir + 'xml/AVTransport1.xml', self.player)
         self.conmanager = Service(

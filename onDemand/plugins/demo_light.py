@@ -29,6 +29,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
         self.log = Logger()
         self.callback = self.receive
         self.stateless = stateless
+        self.events = {'Status': self.set_status}
 
     '''
     Remote functions
@@ -56,22 +57,25 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
     def r_get_status(self):
         return self.status
 
-    def set_status(self, status):
+    def check_status(self, status):
         if status is not self.status:
-            self.log.debug('%r --> %s' % (self.long_address,
-                                          'jour!' if status else 'nuit!'))
-            self.status = status
-            self.event(status, 'status')
+            self.set_status(status)
+
+    def set_status(self, status):
+        self.log.debug('%r --> %s' % (self.long_address,
+                                      'jour!' if status else 'nuit!'))
+        self.status = status
+        self.event(status, 'status')
 
     def receive(self, data):
         if 'samples' in data:
             for sample in data['samples']:
                 if self.pin in sample:
-                    self.set_status(sample[self.pin])
+                    self.check_status(sample[self.pin])
         elif 'parameter' in data:
             for sample in data['parameter']:
                 if self.pin in sample:
-                    self.set_status(sample[self.pin])
+                    self.check_status(sample[self.pin])
 
 
 def get_Demo_light(device=b'/dev/ttyACM0', pin=0, api_level=1,

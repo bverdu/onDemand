@@ -4,8 +4,7 @@ Created on 1 sept. 2015
 
 @author: Bertrand Verdu
 '''
-import uuid
-import socket
+
 from . import Device
 from upnpy_spyne.services.configuration_management import\
     ConfigurationManagement
@@ -17,8 +16,8 @@ class SensorManagement(Device):
     classdocs
     '''
 
-    def __init__(self, path, render, datadir):
-        super(SensorManagement, self).__init__(path)
+    def __init__(self, path, render, datadir, uuid=''):
+        super(SensorManagement, self).__init__(path, uuid)
         self._description = None
         self.datadir = datadir
         self.render = render
@@ -32,8 +31,6 @@ class SensorManagement(Device):
             "onDemand IOT Management Device"
         self.modelName = "onDemand_IOT"
         self.version = (1, 0,)
-        self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
         self.CFG = ConfigurationManagement(
             datadir + 'xml/configurationmanagement.xml',
             self.render,

@@ -4,8 +4,7 @@ Created on 15 sept. 2015
 
 @author: Bertrand Verdu
 '''
-import uuid
-import socket
+
 from . import Device
 from upnpy_spyne.services.hvac_user_operating_mode import UserOperatingMode
 from upnpy_spyne.services.hvac_fan_operating_mode import FanOperatingMode
@@ -20,8 +19,8 @@ class ZoneThermostat(Device):
     classdocs
     '''
 
-    def __init__(self, path, url, render, datadir):
-        super(ZoneThermostat, self).__init__(path)
+    def __init__(self, path, url, render, datadir, uuid=''):
+        super(ZoneThermostat, self).__init__(path, uuid)
         self.deviceURL = url
         self._description = None
         self.datadir = datadir
@@ -36,8 +35,6 @@ class ZoneThermostat(Device):
             "onDemand HVAC Zone thermostat"
         self.modelName = "onDemand_ZoneThermostat"
         self.version = (1, 0,)
-        self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
         HUOM = UserOperatingMode(
             datadir + 'xml/HVAC_UserOperatingMode1.xml',
             self.render,

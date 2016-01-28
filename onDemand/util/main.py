@@ -117,19 +117,23 @@ class get_subservices(object):
                         from upnpy_spyne.devices.ohSource import Source
                         upnp_device = Source(device['path'],
                                              f,
-                                             self.conf.datadir)
+                                             self.conf.datadir,
+                                             uuid=device['id'])
                     else:
                         from upnpy_spyne.devices.mediarenderer\
                             import MediaRenderer
-                        upnp_device = MediaRenderer(
-                            device['path'], f, self.conf.datadir)
+                        upnp_device = MediaRenderer(device['path'], f,
+                                                    self.conf.datadir,
+                                                    uuid=device['id'])
             else:
 
                 upnp_device = getattr(
                     importlib.import_module(
                         'upnpy_spyne.devices.' +
                         device['service'].lower()),
-                    'MainDevice')(device['path'], f, self.conf.datadir)
+                    'MainDevice')(
+                    device['path'], f,
+                    self.conf.datadir, uuid=device['id'])
 
             if config.network in ('lan', 'both'):
 

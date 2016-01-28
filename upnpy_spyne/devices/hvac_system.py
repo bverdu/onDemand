@@ -4,8 +4,7 @@ Created on 15 sept. 2015
 
 @author: Bertrand Verdu
 '''
-import uuid
-import socket
+
 from . import Device
 from upnpy_spyne.services.hvac_user_operating_mode import UserOperatingMode
 from upnpy_spyne.services.hvac_fan_operating_mode import FanOperatingMode
@@ -17,8 +16,8 @@ class HvacSystem(Device):
     classdocs
     '''
 
-    def __init__(self, path, render, datadir):
-        super(HvacSystem, self).__init__(path)
+    def __init__(self, path, render, datadir, uuid=''):
+        super(HvacSystem, self).__init__(path, uuid)
         self._description = None
         self.datadir = datadir
         self.render = render
@@ -32,8 +31,6 @@ class HvacSystem(Device):
             "onDemand HVAC Device"
         self.modelName = "onDemand_HVAC"
         self.version = (1, 0,)
-        self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
         UOM = UserOperatingMode(
             datadir + 'xml/HVAC_UserOperatingMode1.xml',
             self.render,

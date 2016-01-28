@@ -36,12 +36,12 @@ class Structure(Device):
         self.where_id = ''
         super(Structure, self).__init__(data, nestapi.event)
 
-    def set_away(self, value):
+    def r_set_away(self, value):
         if value not in ('home', 'away', 'auto-away', 'unknown'):
             return defer.fail(ValueError)
         return self.structure_id, {'away': value}
 
-    def set_eta(self, value):
+    def r_set_eta(self, value):
         if isinstance(value, dict):
             if len(dict) == 3:
                 if 'trip_id' in dict:

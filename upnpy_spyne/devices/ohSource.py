@@ -3,8 +3,7 @@ Created on 17 avr. 2015
 
 @author: Bertrand Verdu
 '''
-import uuid
-import socket
+
 from upnpy_spyne.devices import Device
 from upnpy_spyne.services.ohplaylist import Playlist
 from upnpy_spyne.services.ohproduct import Product
@@ -15,8 +14,8 @@ from upnpy_spyne.services.ohvolume import Volume
 
 class Source(Device):
 
-    def __init__(self, path, player, datadir):
-        Device.__init__(self, path)
+    def __init__(self, path, player, datadir, uuid=''):
+        Device.__init__(self, path, uuid)
         self._description = None
         self.datadir = datadir
         self.player = player
@@ -30,8 +29,6 @@ class Source(Device):
             "an OpenHome Media Renderer"
         self.modelName = "Snap_Media (OpenHome)"
         self.version = (1, 0,)
-        self.uuid = str(
-            uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
         self.playlist = Playlist(
             datadir + 'xml/playlist.xml', self.player, name=self.name)
         self.sources = [self.playlist]

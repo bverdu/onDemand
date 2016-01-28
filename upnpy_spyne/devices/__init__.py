@@ -57,7 +57,7 @@ class Device(object):
     # SSDP
     server = "Linux/x86_64 UPnP/1.0 upnpy/0.9"
 
-    def __init__(self, path):
+    def __init__(self, path, uuid):
         self.UResource = None
         self.extras = {}
         # Description
@@ -68,7 +68,13 @@ class Device(object):
             #                 {'v': 'urn:schemas-ondemand-org:device-1-0'})
             self.extras.update({'X_location': '/'.join(n[:-1])})
         self.configID = 0
-        self.uuid = None
+        if uuid == '':
+            import uuid
+            import socket
+            self.uuid = str(
+                uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + path))
+        else:
+            self.uuid = uuid
 
         # SSDP
         self.bootID = None

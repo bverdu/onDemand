@@ -9,14 +9,14 @@ import time
 from collections import OrderedDict
 from twisted.web.client import Agent, readBody
 from twisted.web.http_headers import Headers
-from twisted.internet import reactor, defer, task
+from twisted.internet import reactor, defer
 from onDemand.util.data import remove_unicode
 
 
 CONDITION = 'http://api.wunderground.com/api/{api_key}' +\
             '/geolookup/conditions/lang:{lang}/q/{location}.json'
-FORECAST =  'http://api.wunderground.com/api/{api_key}' +\
-            '/forecast/lang:{lang}/q/{location}.json'
+FORECAST = 'http://api.wunderground.com/api/{api_key}' +\
+    '/forecast/lang:{lang}/q/{location}.json'
 # conv = {'ë': 'e', '-': '_', 'ê': 'e'}
 
 
@@ -30,7 +30,7 @@ class Weather(object):
         '''
         Constructor
         '''
-        self.location = ''
+        self.location = location
         self.current = {}
         self.forecast = {}
         self.subscriptions = []
@@ -61,7 +61,10 @@ class Weather(object):
 #                     l += char
 #         return bytes(l)
 
-    def get_current(self, location, callback=None):
+    def get_current(self, location='', callback=None):
+        if location == '':
+            location = self.location
+        location = remove_unicode(location)
         print(location[-1])
 
         def got_current(res, loc):
@@ -73,7 +76,6 @@ class Weather(object):
             reactor.callLater(  # @UndefinedVariable
                 305, self.get_current, *(location, callback))
 #         location = self.format_location(location)
-        location = remove_unicode(location)
         request = CONDITION.format(
             api_key=self.key, lang=self.language, location=location)
         print('%s ? %s' % (location, self.current))
@@ -164,6 +166,12 @@ class Weather(object):
 #         return 'u'
 
 if __name__ == '__main__':
+
+    try:
+        from onDemand.test_data import wu_apikey
+    except:
+        wu_apikey = 'PUT WEATHER UNDERGROUND API KEY HERE'
+
     def show(res):
         for k, v in res.iteritems():
             #             if k == 'current_observation':
@@ -172,7 +180,7 @@ if __name__ == '__main__':
             print('%s:  %s' % (k, v))
 
     def test():
-        w = Weather(u'France/Aspres-sur-Buëch')
+        w = Weather(u'France/Aspres_sur_Buëch', key=wu_apikey)
         d = w.get_current()
         d.addCallback(show)
         reactor.callLater(3, reactor.stop)  # @UndefinedVariable

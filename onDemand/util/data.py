@@ -23,7 +23,7 @@ def remove_unicode(data):
             return 'e'
         elif char in 'ïî':
             return 'i'
-        elif char in ':;,.!§%$£=+-+°&~#"':
+        elif char in ':;,.!§%$£=+°&~#"':
             return '_'
         elif char in 'öô':
             return 'o'
@@ -36,7 +36,7 @@ def remove_unicode(data):
         print('ascii')
         data = data.decode('utf-8')
     for char in data:
-        if char in u'-ëïïîöôéèà&!§,?:êüûâä':
+        if char in u'ëïïîöôéèà&!§,?:êüûâä':
             l += conv(char.encode('utf-8'))
         else:
             l += char

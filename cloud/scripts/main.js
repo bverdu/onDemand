@@ -1,15 +1,18 @@
+/*global require, requirejs */
 var config;
-if (typeof(require) === 'undefined') {
+if (typeof (require) === 'undefined') {
     /* XXX: Hack to work around r.js's stupid parsing.
      * We want to save the configuration in a variable so that we can reuse it in
      * tests/main.js.
      */
-    require = {
+    var require = {
         config: function (c) {
+            "use strict";
             config = c;
         }
     };
 }
+
 require.config({
     baseUrl: '.',
     paths: {
@@ -35,27 +38,32 @@ require.config({
 
         // JQuery
 		//"jquery":		    "bower_components/jquery/dist/jquery",
-        "jquery":               "scripts/jquery_patched",
+        "jquery":               "scripts/jquery.min",
         
         // Bootstrap
         //"bootstrap":        "bower_components/bootstrap/dist/js/bootstrap"
-        "bootstrap":            "scripts/bootstrap.min"
+        "bootstrap":            "scripts/bootstrap.min",
         
         // Bootstrap Plugins
         //"bootstrap.toggle":  "bower_components/bootstrap-toggle/js/bootstrap-toggle"
+        
+        // Mustache.js
+        "mustache":             "scripts/mustache.min"
     },
     "shim": {
         "strophe.roster": ["strophe"],
         "strophe.disco": ["strophe"],
         "strophe.pubsub": ["strophe"],
-        "bootstrap": ["jquery"]
+        "bootstrap": ["jquery"],
+        "mustache":  ["jquery"]
         //"bootstrap.toggle": ["jquery", "bootstrap"]
         
     }
 });
 
-if (typeof(require) === 'function') {
-    require(["strophe"], function(Strophe) {
+if (typeof (require) === 'function') {
+    require(["strophe"], function (Strophe) {
+        "use strict";
         window.Strophe = Strophe;
     });
 }
