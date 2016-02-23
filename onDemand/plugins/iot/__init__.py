@@ -137,10 +137,8 @@ class Iot(Client):
                                 'SensorNumberOfEntries': len(dic),
                                 'SensorCollections': {}})
         sStruct = {'UPnP/SensorMgt': {'SensorEvents': '',
-                                'SensorCollectionsNumberOfEntries': len(dics),
-                                'SensorCollections': sensors}}
-        
-        
+                                      'SensorCollectionsNumberOfEntries': len(dics),
+                                      'SensorCollections': sensors}}
 
     def got_data(self, data):
         #  print('1')
@@ -373,6 +371,49 @@ class Iot(Client):
 
     def r_get_alarms_enabled(self):
         pass
+
+
+class Tree(object):
+
+    def __init__(self):
+        self.tree = {}
+
+    def dump(self):
+        """
+        Get all the paths registered in the server.
+
+        :return: registered resources.
+        """
+        return self.tree.keys()
+
+    def with_prefix(self, path):
+        ret = []
+        for key in self.tree.keys():
+            if path.startswith(key):
+                ret.append(key)
+
+        if len(ret) > 0:
+            return ret
+        raise KeyError
+
+    def with_prefix_resource(self, path):
+        ret = []
+        for key, value in self.tree.iteritems():
+            if path.startswith(key):
+                ret.append(value)
+
+        if len(ret) > 0:
+            return ret
+        raise KeyError
+
+    def __getitem__(self, item):
+        return self.tree[item]
+
+    def __setitem__(self, key, value):
+        self.tree[key] = value
+
+    def __delitem__(self, key):
+        del self.tree[key]
 
 
 class NodeCollection(object):

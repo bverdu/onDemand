@@ -80,11 +80,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
 
 def get_Demo_light(device=b'/dev/ttyACM0', pin=0, api_level=1,
                    long_address=b'000000000000FFFF',
-<<<<<<< HEAD
                    address=b'FFFE', net_type='lan',  stateless=True, **kwargs):
-=======
-                   address=b'\xFF\xFE', net_type='lan',  stateless=True, **kwargs):
->>>>>>> 5a256f732377638d0f11b1928e5d0227f655e305
     from twisted.internet import reactor
     from twisted.internet.serialport import SerialPort
     f = Demo_light_factory(long_address, address, pin, net_type, stateless)
