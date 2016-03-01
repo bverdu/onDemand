@@ -24,20 +24,11 @@ class SSDPServer(service.MultiService):  # @UndefinedVariable
     '''
     Main class to manage SSDP
     '''
-#     __slots__ = ['name',
-#                  'services',
-#                  'device',
-#                  'targets',
-#                  'listener',
-#                  'ssdp',
-#                  'client',
-#                  'ssdp_client',
-#                  '__dict__']
     name = "SSDPServer"
     targets = ['ssdp:all', 'upnp:rootdevice', ]
     listener = None
 
-    def __init__(self, device):
+    def __init__(self, device, announce=True):
         self.services = []
         '''
         Initialization of SSDP server
@@ -57,10 +48,11 @@ class SSDPServer(service.MultiService):  # @UndefinedVariable
                 listenMultiple=True,
                 interface=SSDP_ADDR_V4)
             self.ssdp.setServiceParent(self)
-            self.client = SSDP_Client(self, get_default_v4_address())
-            self.ssdp_client = internet.UDPServer(  # @UndefinedVariable
-                0, self.client, self.client.interface)
-            self.ssdp_client.setServiceParent(self)
+            if announce:
+                self.client = SSDP_Client(self, get_default_v4_address())
+                self.ssdp_client = internet.UDPServer(  # @UndefinedVariable
+                    0, self.client, self.client.interface)
+                self.ssdp_client.setServiceParent(self)
 
     def startService(self):
         '''
@@ -70,6 +62,9 @@ class SSDPServer(service.MultiService):  # @UndefinedVariable
 
     def stopService(self):
         self.client.sendall_NOTIFY(None, 'ssdp:byebye', True)
+
+    def update_hosts(self, header):
+        log.msg("********!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*********")
 
 
 class SSDP_Client(DatagramProtocol):
@@ -324,7 +319,7 @@ class SSDP_Listener(DatagramProtocol):
         self.respond(headers, (address, port))
 
     def received_NOTIFY(self, headers, (address, port)):
-        #         log.msg("received_NOTIFY: %s" % headers)
+        #  log.msg("received_NOTIFY: %s" % headers)
         try:
             if headers['nt'] == 'upnp:rootdevice':
                 self.ssdp.update_hosts(headers)

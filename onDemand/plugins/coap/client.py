@@ -150,7 +150,7 @@ if __name__ == '__main__':
 
     resource = resource.Endpoint(None)
     protocol = coap.Coap(resource)
-    agent = Agent(protocol, b'fd12::1')
+    agent = Agent(protocol, b'fd12:1::5844:3e6a:2da8:a346')
     reactor.listenUDP(0, protocol, "::")  # @UndefinedVariable
     reactor.callWhenRunning(test, agent)  # @UndefinedVariable
     reactor.run()  # @UndefinedVariable
