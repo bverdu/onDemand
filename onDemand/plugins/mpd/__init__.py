@@ -757,7 +757,7 @@ class Mpd_factory(ReconnectingClientFactory, Client):
         return self.tracksmax
 
     def r_transport_state(self, instanceID=0):
-        if self.parent.type == 'Source':
+        if 'Source' in self.parent.deviceType:
             return self.oh_state
         return self.upnp_state
 

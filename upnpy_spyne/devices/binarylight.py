@@ -13,11 +13,11 @@ class MainDevice(Device):
     classdocs
     '''
 
-    def __init__(self, path, player, datadir, uuid=''):
-        super(MainDevice, self).__init__(path, uuid)
+    def __init__(self, path, renderer, datadir, uuid=''):
+        super(MainDevice, self).__init__(path, renderer, uuid)
         self._description = None
         self.datadir = datadir
-        self.player = player
+        self.renderer = renderer
         self.type = 'UpnP'
         self.deviceType = 'urn:schemas-upnp-org:device:BinaryLight:1'
         self.manufacturer = "upnpy"

@@ -11,7 +11,8 @@ __version__ = '0.1a'
 
 
 class Client(object):
-    parent = None
+
+    __slots__ = ('parent', 'uuid')
 
     def __getattribute__(self, attr):
         method = super(Client, self).__getattribute__(attr)

@@ -17,9 +17,8 @@ ENDPOINT = 'zigbee'
 
 class Demo_light_factory(ReconnectingClientFactory, Client):
 
-    def __init__(self, long_address=b'\x00\x00\x00\x00\x00\x00\xFF\xFF',
-                 address=b'\xFF\xFE', pin=0,
-                 api_level=1, net_type=None, stateless=True):
+    def __init__(self, long_address=b'000000000000FFFF',
+                 address=b'FFFE', pin=0, stateless=True):
         self.long_address = long_address.decode('hex')
         self.address = address
         self._pin = pin

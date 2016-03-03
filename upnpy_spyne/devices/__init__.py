@@ -56,10 +56,12 @@ class Device(object):
 
     # SSDP
     server = "Linux/x86_64 UPnP/1.0 upnpy/0.9"
+    #  UDN = property(get_UDN)
 
     def __init__(self, path, uuid):
         self.UResource = None
         self.extras = {}
+        self.locked = False
         # Description
         n = path.split('/')
         self.friendlyName = self.name = n[-1]
@@ -109,7 +111,6 @@ class Device(object):
         if self.uuid is None:
             return None
         return 'uuid:%s' % self.uuid
-    UDN = property(get_UDN)
 
     def dump(self):
         log.msg("xml tree dumped")
@@ -164,21 +165,35 @@ class Device(object):
 
         # service List
         serviceList = et.Element('serviceList')
-        for service in self.services:
-            _service = et.Element('service')
-            _service.append(make_element('serviceType', service.serviceType))
-            _service.append(make_element('serviceId', service.serviceId))
-            _service.append(make_element(
-                            'controlURL',
-                            '/' + self.uuid + '/' +
-                            service.serviceUrl + '/control'))
-            _service.append(make_element(
-                            'eventSubURL',
-                            '/' + self.uuid + '/' +
-                            service.serviceUrl + '/event'))
-            _service.append(make_element('SCPDURL', '/' + self.uuid + '/' +
-                                         service.serviceUrl))
-            serviceList.append(_service)
+        if not self.locked:
+            for service in self.services:
+                _service = et.Element('service')
+                _service.append(
+                    make_element('serviceType', service.serviceType))
+                _service.append(make_element('serviceId', service.serviceId))
+                _service.append(make_element(
+                                'controlURL',
+                                '/' + self.uuid + '/' +
+                                service.serviceUrl + '/control'))
+                _service.append(make_element(
+                                'eventSubURL',
+                                '/' + self.uuid + '/' +
+                                service.serviceUrl + '/event'))
+                _service.append(make_element('SCPDURL', '/' + self.uuid + '/' +
+                                             service.serviceUrl))
+                serviceList.append(_service)
+        _service = et.Element('service')
+        _service.append(make_element('serviceType',
+                                     "urn:lazytech-io:service:Bind:1"))
+        _service.append(make_element('serviceId',
+                                     "urn:lazytech-io:serviceId:Bind"))
+        _service.append(make_element('controlURL',
+                                     '/' + self.uuid + '/Bind/control'))
+        _service.append(make_element('controlURL',
+                                     '/' + self.uuid + '/Bind/event'))
+        _service.append(make_element('SCPDURL',
+                                     '/' + self.uuid + '/Bind'))
+        serviceList.append(_service)
         device.append(serviceList)
 
         # device List

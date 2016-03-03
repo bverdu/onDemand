@@ -29,6 +29,7 @@ network = 'lan'
 cloud_user = 'test@xmpp.example.com'
 cloud_secret = 'password'
 datadir = '/usr/share/onDemand/'
+custom_services = {}
 
 
 # imports = '''
