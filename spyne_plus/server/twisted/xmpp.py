@@ -52,15 +52,16 @@ class TwistedXMPPApp(ServerBase):
 
         def _cb_deferred(ret, ctx):
             #             print('deferred: %s' % str(ret))
-            log.debug('deferred result')
-            om = ctx.descriptor.out_message
-            if ((not issubclass(om, ComplexModelBase)) or
-                    len(om._type_info) <= 1):
-                ctx.out_object = (ret.encode('utf-8'))
-            else:
-                ctx.out_object = (r.decode('utf-8') for r in ret)
+            log.debug('deferred result: %s' % ret.__repr__())
+#             om = ctx.descriptor.out_message
+#             if ((not issubclass(om, ComplexModelBase)) or
+#                     len(om._type_info) <= 1):
+#                 ctx.out_object = (ret.encode('utf-8'))
+#             else:
+#                 ctx.out_object = (r.decode('utf-8') for r in ret)
+            ctx.out_object = [ret.encode('utf-8')]
             self.get_out_string(ctx)
-            return ctx.out_string[0]
+            return ctx.out_string
 
         def _eb_deferred(error, ctx):
             ctx.out_error = error.value
@@ -97,13 +98,14 @@ class TwistedXMPPApp(ServerBase):
             if isinstance(ret, Deferred):
                 if ret.called:
                     return defer.succeed(_cb_deferred(ret.result, ctx))
+                log.debug('result type async/deferred')
                 ret.addCallback(_cb_deferred, ctx)
                 ret.addErrback(_eb_deferred, ctx)
                 return ret
             else:
                 self.get_out_string(ctx)
 #                 print('no deferred: %s' % ctx.out_string)
-                log.debug('result type no deferred')
+                log.debug('result type sync')
                 return defer.succeed(ctx.out_string)
 
 

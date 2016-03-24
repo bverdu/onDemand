@@ -64,7 +64,8 @@ class SSDPServer(service.MultiService):  # @UndefinedVariable
         self.client.sendall_NOTIFY(None, 'ssdp:byebye', True)
 
     def update_hosts(self, header):
-        log.msg("********!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*********")
+        pass
+        # log.msg("********!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*********")
 
 
 class SSDP_Client(DatagramProtocol):
@@ -143,7 +144,7 @@ class SSDP_Client(DatagramProtocol):
 
         usn, nt = build_notification_type(uuid, nt)
 
-        log.msg("send_NOTIFY %s:%s" % (nts, usn))
+        #  log.msg("send_NOTIFY %s:%s" % (nts, usn))
 
         headers = {
             # max-age is notifySequenceInterval + 10 minutes

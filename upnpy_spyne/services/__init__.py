@@ -45,16 +45,16 @@ class Service(object):
     _description = None
     client = None
     upnp_type = 'upnp'
+    stateVariables = []
+    actions = OrderedDict()
 
     def __init__(
-            self, svcname, tns, client=None, xml=None, appname='Application'):
+            self, svcname, tns, client=None, xml=None,
+            appname='Application', dynamic=False):
         #         log.msg(self.__class__.stateVariables)
         self.name = svcname
         self.client = client
-
-        def _map_context(ctx):
-            ctx.udc = UserDefinedContext(self.client)
-        self.actions = {}
+        self.actions = OrderedDict()
         self.soap_functions = {}
         self.stateVariables = {}
         self.app = None
@@ -62,20 +62,24 @@ class Service(object):
         self.serviceUrl = tns.split(':')[-2].lower()
         if xml is not None:
             buildServiceFromXml(self.__class__, xml)
+        self.appname = appname
+        self.dynamic = dynamic
+        if not self.dynamic:
+            self.make_app()
+
+    def make_app(self):
+
+        def _map_context(ctx):
+            ctx.udc = UserDefinedContext(self.client)
         tmp = OrderedDict()
         for v in self.__class__.stateVariables:
             tmp.update({v.name: v})
         self.stateVariables = tmp
-#         print(self.__class__.stateVariables)
-#         print(self.__class__.stateVariables['SearchCapabilities'])
-#         print(self.__class__.actions.items())
-#         print(self.actions.items())
         for name, arguments in self.__class__.actions.items():
             self.actions.update({name: arguments})
             args_in = []
             args_out = []
             for arg in arguments:
-                #                 print(arg)
                 try:
                     typ = self.stateVariables[
                         arg.stateVariable.strip()].dataType
@@ -98,10 +102,15 @@ class Service(object):
             action_out_varnames = ()
             args = ()
             action_out_varname = ''
-            n = '_'.join(('r', cc_to_us(name)))
+            if self.dynamic:
+                n = 'r_' + name
+            else:
+                n = '_'.join(('r', cc_to_us(name)))
             f = make_func(n)
+
             if len(args_in) > 0:
                 if len(args_in) > 1:
+                    print('vvvvvvvvv')
                     args = [arg[1] for arg in args_in]
                     action_in_type = [arg[0] for arg in args_in]
                 else:
@@ -176,25 +185,32 @@ class Service(object):
                 else:
                     func = rpc(_operation_name=name)(f)
 #             print(name)
-#             print(f.fname)
+#             print(func)
             self.soap_functions.update({name: func})
         self.subscriptions = {}
-        if appreg.get_application(self.tns, appname):
-            print('**/*/')
-            appname = appname + '_'
+        if appreg.get_application(self.tns, self.appname):
+            self.appname = self.appname + '_'
         soap_service = type(self.name, (ServiceBase,), self.soap_functions)
         soap_service.tns = self.tns
         app = Application([soap_service], tns=self.tns,
                           in_protocol=Soap11(),
                           out_protocol=Soap11(),
-                          name=appname)
+                          name=self.appname)
         app.event_manager.add_listener('method_call', _map_context)
         self.app = app
 #         print(self.soap_functions)
 #         print('name: %s, methods: %s' %
-#               (appname, app.interface.service_method_map))
+#               (self.appname, app.interface.service_method_map))
         if self.event_properties is None:
             self.event_properties = {}
+
+    def append_action(self, action):
+        for name, largs in action.iteritems():
+            args = [ServiceActionArgument(*arg) for arg in largs]
+            self.__class__.actions.update({name: args})
+
+    def append_state_variable(self, var):
+        self.__class__.stateVariables.append(ServiceStateVariable(*var))
 
     def _get_type(self, typ):
         if typ in ('string', 'bin.base64', 'uri'):
@@ -306,9 +322,11 @@ class Service(object):
 
     def dumps(self, force=False):
         if self.__class__._description is None or force:
+            log("dumping %s" % self.name)
             self.__class__._description =\
                 '<?xml version="1.0" encoding="utf-8"?>' +\
                 et.tostring(self.dump())
+            log(self.__class__._description)
         return self.__class__._description
 
 

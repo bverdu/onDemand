@@ -53,8 +53,7 @@ class Subservices(object):
                                                             house_name,
                                                             room_name,
                                                             dev['name']))})
-                                                    self.set(
-                                                        dev)
+                                                    self.set(dev)
                                         else:
                                             setattr(conf,
                                                     room,
@@ -142,15 +141,17 @@ class Subservices(object):
         upnp_device = Device(device['path'], device['id'])
         for name, value in dic.iteritems():
             setattr(upnp_device, name, value)
-        for service in dic['_services']:
-            upnp_device.services.append(getattr(importlib.impo)
-            
+#         for service in dic['_services']:
+#             upnp_device.services.append(getattr(importlib.impo))
 
     def set(self, device):
         log.debug(device['path'])
         room = device['path'].split('/')[3]
         if device['type'] in self.conf.hmodules:
-            hwopts = self.conf.hmodules[device['type']]['options']
+            if 'options' in self.conf.hmodules[device['type']]:
+                hwopts = self.conf.hmodules[device['type']]['options']
+            else:
+                hwopts = {}
             module_name = self.conf.hmodules[device['type']]['module']
             if device['type'] not in self.endpoints:
                 t = getattr(
@@ -175,32 +176,32 @@ class Subservices(object):
                 self.endpoints[device['type']].connect(f)
 
             f.room = room
-            if device['service'] == 'MediaRenderer':
+#             if device['service'] == 'MediaRenderer':
+#
+#                 for mt in self.conf.media_types:
+#
+#                     if mt == 'oh':
+#
+#                         from upnpy_spyne.devices.ohSource import Source
+#                         upnp_device = Source(device['path'],
+#                                              f,
+#                                              self.conf.datadir,
+#                                              uuid=device['id'])
+#                     else:
+#                         from upnpy_spyne.devices.mediarenderer\
+#                             import MediaRenderer
+#                         upnp_device = MediaRenderer(device['path'], f,
+#                                                     self.conf.datadir,
+#                                                     uuid=device['id'])
+#             else:
 
-                for mt in self.conf.media_types:
-
-                    if mt == 'oh':
-
-                        from upnpy_spyne.devices.ohSource import Source
-                        upnp_device = Source(device['path'],
-                                             f,
-                                             self.conf.datadir,
-                                             uuid=device['id'])
-                    else:
-                        from upnpy_spyne.devices.mediarenderer\
-                            import MediaRenderer
-                        upnp_device = MediaRenderer(device['path'], f,
-                                                    self.conf.datadir,
-                                                    uuid=device['id'])
-            else:
-
-                upnp_device = getattr(
-                    importlib.import_module(
-                        'upnpy_spyne.devices.' +
-                        device['service'].lower()),
-                    'MainDevice')(
-                    device['path'], f,
-                    self.conf.datadir, uuid=device['id'])
+            upnp_device = getattr(
+                importlib.import_module(
+                    'upnpy_spyne.devices.' +
+                    device['service'].lower()),
+                'MainDevice')(
+                device['path'], f,
+                self.conf.datadir, uuid=device['id'])
 
             if config.network in ('lan', 'both'):
 
@@ -304,4 +305,4 @@ if __name__ == '__main__':
     globalLogBeginner.beginLoggingTo(observers)
 
 #     load_yaml('/home/babe/Projets/eclipse/onDemand/data/', filename='test.yml')
-    Subservices('/home/babe/Projets/eclipse/onDemand/data/').get()
+    Subservices({}, '/home/babe/Projets/eclipse/onDemand/data/').get_modules()

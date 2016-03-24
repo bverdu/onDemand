@@ -14,7 +14,7 @@ define(function (require) {
         $msg = strophe.$msg,
         $build = strophe.$build,
         b64_sha1 = strophe.SHA1.b64_sha1,
-        BOSH_SERVICE = 'http://bosh.metajack.im:5280/xmpp-httpbind',
+        BOSH_SERVICE = 'https://lazytech.io:5281/http-bind',
         uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
             /[xy]/g,
             function (c) {
@@ -433,6 +433,7 @@ define(function (require) {
     // service class
     
     function Service(nodes, desc, addr, widget) {
+        console.log(desc);
         service_id += 1;
         this.id = service_id.toString();
         this.addr = addr;
@@ -455,7 +456,7 @@ define(function (require) {
             inputs,
             outputs;
         for (i = 0; i < nodes.length; i += 1) {
-            //console.log(nodes[i].nodeName);
+            console.log(nodes[i].nodeName);
             this[nodes[i].nodeName] = nodes[i].childNodes[0].nodeValue;
         }
         t = this.serviceId.split(":");
@@ -575,7 +576,12 @@ define(function (require) {
                 log('Services :');
                 for (j = 0;
                         j < dev_tree[i].childNodes.length; j += 1) {
+                    if (query.childNodes.length - 1 === service_index) 
+                        break;
                     service_index += 1;
+                    console.log(service_index);
+                    console.log(query);
+                    
                     s = new Service(
                         dev_tree[i].childNodes[j].childNodes,
                         query.childNodes[service_index],
@@ -786,6 +792,7 @@ define(function (require) {
     }
     
     function onDescription(desc) {
+        console.log(desc);
         var device = new Device(desc.getAttribute('from'), desc), evt, s;
         log('Discovered: ' + desc.getAttribute('from'));
         display_device(device, $('#objects'));

@@ -59,6 +59,7 @@ class Device(object):
     #  UDN = property(get_UDN)
 
     def __init__(self, path, uuid):
+        self.dynamic = False
         self.UResource = None
         self.extras = {}
         self.locked = False
@@ -111,6 +112,7 @@ class Device(object):
         if self.uuid is None:
             return None
         return 'uuid:%s' % self.uuid
+    UDN = property(get_UDN)
 
     def dump(self):
         log.msg("xml tree dumped")

@@ -77,6 +77,9 @@ class UPnPService(StreamServerEndpointService):
     def add_device(self, device):
         self.devices.append(device)
         device.parent = self
+        if device.dynamic:
+            if not device.initialized:
+                return
         if self.started:
             device.location = "http://%s:" + str(self.getPort())
             device.icons = [

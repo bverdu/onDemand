@@ -354,6 +354,6 @@ class XmppEvent(object):
         if self.addr:
             iq.send(to=self.addr)
         else:
-            self.log.debug('yo!')
-            self.log.debug(iq.toXml())
+            #             self.log.debug('yo!')
+            #             self.log.debug(iq.toXml())
             iq.send()

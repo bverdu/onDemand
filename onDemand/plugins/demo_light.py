@@ -29,6 +29,7 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
         self.callback = self.receive
         self.stateless = stateless
         self.events = {'Status': self.set_status}
+        self.event = None
 
     '''
     Remote functions
@@ -48,7 +49,8 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
 
             if self.stateless:
                 self.status = value
-                self.event(value, 'status')
+                if self.event:
+                    self.event(value, 'status')
 
     def r_get_target(self):
         return self.status
@@ -64,7 +66,8 @@ class Demo_light_factory(ReconnectingClientFactory, Client):
         self.log.debug('%r --> %s' % (self.long_address,
                                       'jour!' if status else 'nuit!'))
         self.status = status
-        self.event(status, 'status')
+        if self.event:
+            self.event(status, 'status')
 
     def receive(self, data):
         if 'samples' in data:

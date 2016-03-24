@@ -17,9 +17,6 @@ from twisted.words.protocols.jabber import xmlstream, client
 from twisted.words.protocols.jabber.client import IQ
 from twisted.words.protocols.jabber.jid import JID, parse
 from twisted.web import static
-from spyne.application import Application
-from spyne.service import ServiceBase
-from spyne.protocol.soap import Soap11
 from upnpy_spyne.event import XmppEvent
 from upnpy_spyne.services import UserDefinedContext
 from upnpy_spyne.utils import get_default_v4_address
@@ -44,23 +41,13 @@ class XmppService(Service):
         self.active_controllers = []
         self.webserver = web_server
         self.resource = web_server.resource
+        self.ready = False
         device.location = user
-
-        def _map_context(ctx):
-            ctx.udc = UserDefinedContext(device.player)
-
         self._jid = _jid = ''.join(
             (user, '/', device.deviceType, ':uuid:', device.uuid))
         self.device = device
         device.parent = self
-        for service in device.services:
-            self.services.update(
-                {str(service.serviceId):
-                    {'app': TwistedXMPPApp(service.app), 'svc': service}})
-            for var in service.stateVariables.values():
-                if var.sendEvents:
-                    self.nodes.append(
-                        (var, service.serviceType, service))
+        self.add_device(device)
         self.users = {user: False}
         for user in userlist:
             self.users.update({user: False})
@@ -72,7 +59,27 @@ class XmppService(Service):
         f.addBootstrap(xmlstream.INIT_FAILED_EVENT, self.init_failed)
         self.finished = defer.Deferred()
 
+    def add_device(self, device):
+        if device.dynamic:
+            if not device.initialized:
+                return
+        for service in device.services:
+            self.services.update(
+                {str(service.serviceId):
+                    {'app': TwistedXMPPApp(service.app), 'svc': service}})
+            for var in service.stateVariables.values():
+                if var.sendEvents:
+                    self.nodes.append(
+                        (var, service.serviceType, service))
+        self.ready = True
+        if device.dynamic:
+            self.connect()
+
     def startService(self):
+        if self.ready:
+            self.connect()
+
+    def connect(self):
         self.connector = SRVConnector(
             self.reactor, 'xmpp-client', self.jid.host,
             self.factory, defaultPort=5222)
@@ -193,17 +200,18 @@ class XmppService(Service):
             query['name'] = self.device.uuid
             d = tostring(self.device.dump(), encoding='unicode')
             query.addRawXml(d)
-    #         print(query.toXml())
+#             print(query.toXml())
             for service in self.device.services:
                 s = tostring(service.dump(), encoding='unicode')
     #             print(s)
+                #print(tostring(service.dump(), pretty_print=True))
                 query.addRawXml(s)
-    #         print(query.toXml())
             self.description = query.toXml()
             iq.addChild(query)
             iq['id'] = dest['id']
 #             self.description = iq
 #         print(iq.toXml())
+
         iq.addCallback(sent)
         iq.send(to=dest['from'])
 
@@ -215,13 +223,13 @@ class XmppService(Service):
         if self.pep:
             for node in self.nodes:
                 node_name = '/'.join((self._jid, node[1]))
-                print(self.registrations)
+                #  print(self.registrations)
                 self.log.debug(node_name)
                 if node_name in self.registrations:
                     self.log.debug('already registered: %s' % node_name)
                     continue
                 self.registrations.append(node_name)
-                print(self.registrations)
+                #  print(self.registrations)
                 self.log.debug('node {name} registered', name=node_name)
                 event = XmppEvent(
                     node_name,
@@ -341,7 +349,7 @@ class XmppService(Service):
         if len(self.active_controllers) < 1:
             self.registrations = []
             return
-        print(self.registrations)
+        #  print(self.registrations)
         if name in self.registrations:
             self.log.debug('renew: %s' % name)
             event = XmppEvent(
@@ -380,10 +388,12 @@ class XmppService(Service):
 #                 print(root.toXml())
                 for child in root.children:
                     if child.name == 'Header':
+                        self.log.debug('Header')
                         res = self.services[
                             child.children[0]['serviceId']]['app'].handle_rpc(
                                 root.toXml(), child.children[0]['serviceId'])
                     elif child.name == 'Body':
+                        self.log.debug('Body')
                         decomposed = child.children[0].uri.split(':')
                         guessed_id = ':'.join(
                             (decomposed[0],
@@ -398,9 +408,10 @@ class XmppService(Service):
                         continue
 
                     res.addCallback(self.respond_rpc, iq['from'], iq['id'])
+                    break
 
     def respond_rpc(self, resp, to, queryID):
-        #         print('send: %s' % resp)
+        print('send: %s' % resp)
         #         self.log.debug('respond rpc: %s' % resp[0][39:])
         res = IQ(self.xmlstream, 'result')
         res['id'] = queryID

@@ -27,12 +27,13 @@ class Main(service.MultiService):
 
     def __init__(self, path):
         super(Main, self).__init__()
-        self.services = []
         self.ui = None
         self.manager = Subservices(self, path)
+        for service in self.manager.get_services():
+            self.add_service(service)
 
     def add_service(self, service):
-        self.append(service)
+        self.services.append(service)
         service.parent = self
 #         if hasattr(service, 'register_art_url'):
 #             mainService.register_art_url = sub_service.register_art_url

@@ -6,7 +6,7 @@ Created on 6 jan. 2015
 import socket
 from twisted.python import usage
 # from guppy import hpy
-from onDemand import main_spyne, config
+from onDemand import main, config
 
 # h = hpy()
 
@@ -34,4 +34,4 @@ class Options(usage.Options):
 
 
 def makeService(config):
-    return main_spyne.makeService(config)
+    return main.makeService(config)

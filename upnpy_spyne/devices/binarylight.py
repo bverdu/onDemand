@@ -14,7 +14,7 @@ class MainDevice(Device):
     '''
 
     def __init__(self, path, renderer, datadir, uuid=''):
-        super(MainDevice, self).__init__(path, renderer, uuid)
+        super(MainDevice, self).__init__(path, uuid)
         self._description = None
         self.datadir = datadir
         self.renderer = renderer
@@ -28,6 +28,6 @@ class MainDevice(Device):
         self.modelName = "Snap_Light (OpenHome)"
         self.version = (1, 0,)
         self.switch = SwitchPower(
-            datadir + 'xml/switchpower.xml', self.player, name=self.name)
+            datadir + 'xml/switchpower.xml', renderer, name=self.name)
         self.switch.parent = self
         self.services = [self.switch]

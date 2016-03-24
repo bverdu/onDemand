@@ -43,7 +43,6 @@ class serialBytesProtocol(LineReceiver):
         self.log.debug('serial connected')
 
     def rawDataReceived(self, data):
-        print('rrr')
         for name in self.__callbacks:
             self.__callbacks[name](data)
 
