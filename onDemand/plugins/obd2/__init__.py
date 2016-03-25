@@ -74,13 +74,16 @@ class Call_Proxy(object):
 
 
 def get_Obd(port=b'/dev/pts/3', **kwargs):
-    from twisted.internet.serialport import SerialPort
+    if ':' in port:  # Bluetooth address
+        from onDemand.protocols.async_bluetooth import RfcommPort as SerialPort
+    else:
+        from twisted.internet.serialport import SerialPort  # @Reimport
     from base import BaseProtocol
     endpoint = BaseProtocol()
     f = Obd_Factory()
     endpoint.connect(f)
 
-    SerialPort(endpoint, port, reactor)
+    SerialPort(endpoint, port, reactor, **kwargs)
 
     return endpoint, f
 
@@ -91,7 +94,7 @@ if __name__ == '__main__':
     observers = [textFileLogObserver(sys.stdout)]
     globalLogBeginner.beginLoggingTo(observers)
 
-    e, f = get_Obd()
+    e, f = get_Obd('18:5E:0F:C1:0E:A7')
 
     def test():
         d = f.r_DISTANCE_W_MIL()
